@@ -7,7 +7,7 @@ import { saveDocument, relatedDocuments } from '#lib/server/db.ts';
 export async function POST({ request }) {
 	const { images, lang } = await request.json();
 	if (!Array.isArray(images) || images.length === 0) error(400, 'No images');
-	const l = lang === 'en' ? 'en' : 'de';
+	const l = lang === 'de' ? 'de' : 'en';
 
 	let analysis;
 	try {

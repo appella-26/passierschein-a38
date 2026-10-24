@@ -12,6 +12,8 @@ export async function POST({ request }) {
 		.map((m: any) => ({ role: m.role, content: m.content.slice(0, 4000) }));
 	if (!history.length || history.at(-1)!.role !== 'user') error(400, 'Last message must be from the user');
 
+	const lang = body.lang === 'de' ? 'de' : 'en';
+
 	const encoder = new TextEncoder();
 	const stream = new ReadableStream({
 		async start(controller) {
@@ -25,7 +27,7 @@ export async function POST({ request }) {
 			try {
 				await runAssistant(
 					history,
-					{ lang: body.lang === 'en' ? 'en' : 'de', caseId: typeof body.case_id === 'string' ? body.case_id : null, signal: request.signal },
+					{ lang, caseId: typeof body.case_id === 'string' ? body.case_id : null, signal: request.signal },
 					emit
 				);
 			} catch (e) {
@@ -34,7 +36,12 @@ export async function POST({ request }) {
 					const status = typeof (e as { status?: unknown })?.status === 'number' ? (e as { status: number }).status : undefined;
 					const reason = (e instanceof Error ? e.cause : null) as { finishReason?: string } | null;
 					console.error('[assistant] The configured AI provider could not complete the request', { status, finishReason: reason?.finishReason });
-					emit({ type: 'error', message: 'Der Assistent ist gerade nicht erreichbar. Prüfen Sie den API-Schlüssel oder versuchen Sie es später erneut.' });
+					emit({
+						type: 'error',
+						message: lang === 'de'
+							? 'Der Assistent ist gerade nicht erreichbar. Prüfen Sie den API-Schlüssel oder versuchen Sie es später erneut.'
+							: 'We couldn’t reach the assistant. Check your API key or try again later.'
+					});
 				}
 			} finally {
 				try { controller.close(); } catch { /* already closed */ }
