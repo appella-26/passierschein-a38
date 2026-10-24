@@ -111,6 +111,7 @@ test('without a phone number the call waits for the hotline instead of dialing',
 test('the hotline session carries the call variables and a secret for this call only', async ({ request }) => {
 	const first = await startCall(request);
 	const second = await startCall(request);
+	expect(await (await request.get(`/api/calls/${first}/session`)).json()).toEqual({ senderName: 'Finanzamt Mannheim-Stadt', userName: 'Kevin' });
 	const { session } = await answer(request, first);
 	expect(session.conversationToken).toMatch(/^token_/);
 	expect(session).toMatchObject({ senderName: 'Finanzamt Mannheim-Stadt', userName: 'Kevin' });
@@ -120,6 +121,7 @@ test('the hotline session carries the call variables and a secret for this call 
 	expect(token.length).toBeGreaterThan(16);
 	// Answered once: a second session or another conversation id is refused.
 	expect((await request.post(`/api/calls/${first}/session`)).status()).toBe(409);
+	expect((await request.get(`/api/calls/${first}/session`)).status()).toBe(409);
 	expect((await request.post(`/api/calls/${first}/conversation`, { data: { conversationId: 'conv_other' } })).status()).toBe(409);
 	expect((await request.post('/api/calls/nope/session')).status()).toBe(409);
 	// The per-call token works for its own call, not for another one; the global secret still works.

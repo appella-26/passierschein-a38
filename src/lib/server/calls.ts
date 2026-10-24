@@ -238,6 +238,13 @@ function browserCall(id: string): Call {
 	return call;
 }
 
+/** Who the hotline page plays and who it introduces, before anyone answers. */
+export function hotlineInfo(id: string) {
+	const call = browserCall(id);
+	if (call.conversationId) throw new CallStateError('The hotline has already answered this call');
+	return { senderName: call.senderName, userName: env.USER_DISPLAY_NAME };
+}
+
 /** What the hotline page needs to run the agent over WebRTC: a short-lived token and the call's variables. */
 export async function startBrowserSession(id: string) {
 	const call = browserCall(id);

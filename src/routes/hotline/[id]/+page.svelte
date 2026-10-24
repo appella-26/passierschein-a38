@@ -2,21 +2,21 @@
   // Demo hotline (CALL_MODE=browser): this device plays the organisation being called.
   // It runs the same ElevenLabs agent over WebRTC, so no phone number or telephony account is needed.
   // The call screen on the user's device follows along through the usual report_status webhook and SSE.
-  import { onDestroy } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { page } from '$app/state';
   import type { VoiceConversation } from '@elevenlabs/client';
   import { t } from '#lib/i18n.ts';
-  import { ApiError, post } from '#lib/api.ts';
+  import { ApiError, post, request } from '#lib/api.ts';
   import type { CallEvent, CallState } from '#lib/types.ts';
   import Card from '#lib/components/Card.svelte';
   import Button from '#lib/components/Button.svelte';
   import Icon from '#lib/components/Icon.svelte';
 
-  type Phase = 'ringing' | 'connecting' | 'live' | 'handed_over' | 'ended' | 'unavailable' | 'error';
+  type Phase = 'loading' | 'ringing' | 'connecting' | 'live' | 'handed_over' | 'ended' | 'unavailable' | 'error';
   interface Session { conversationToken: string; dynamicVariables: Record<string, string>; senderName: string; userName: string }
 
   const id = $derived(page.params.id ?? '');
-  let phase = $state<Phase>('ringing');
+  let phase = $state<Phase>('loading');
   let speaking = $state(false);
   let sender = $state('');
   let user = $state('');
@@ -100,6 +100,16 @@
     }
   }
 
+  onMount(async () => {
+    try {
+      const info = await request<{ senderName: string; userName: string }>(`/api/calls/${encodeURIComponent(id)}/session`);
+      sender = info.senderName;
+      user = info.userName;
+      phase = 'ringing';
+    } catch (error) {
+      phase = error instanceof ApiError && (error.status === 404 || error.status === 409) ? 'unavailable' : 'error';
+    }
+  });
   onDestroy(() => { void leave('ended'); });
   const name = $derived(sender || t('hotlineTitle'));
 </script>
@@ -111,9 +121,11 @@
       <Icon name={phase === 'live' || phase === 'connecting' ? 'headset' : phase === 'error' || phase === 'unavailable' ? 'warning' : phase === 'ringing' ? 'phone' : 'check'} size={42} />
     </span>
     <p class="eyebrow mb-3 text-outline">{t('hotlineTitle')}</p>
-    {#if phase === 'ringing' || phase === 'connecting'}
+    {#if phase === 'loading'}
+      <p role="status" class="text-body-md text-outline">{t('loading')}</p>
+    {:else if phase === 'ringing' || phase === 'connecting'}
       <h1 class="font-headline text-headline-xl-mobile text-primary sm:text-headline-xl">{t('hotlineRinging')}</h1>
-      <p class="mt-4 max-w-md text-body-md text-on-surface-variant">{t('hotlineIntro', { sender: name })}</p>
+      <p class="mt-4 max-w-md text-body-md text-on-surface-variant">{t('hotlineRole', { sender: name })}</p>
       <Button class="mt-7 w-full max-w-sm" onclick={answer} disabled={phase === 'connecting'}><Icon name="phone" />{t(phase === 'connecting' ? 'answeringCall' : 'answerCall')}</Button>
     {:else if phase === 'live'}
       <h1 class="font-headline text-headline-xl-mobile text-primary sm:text-headline-xl">{t('hotlineRole', { sender: name })}</h1>
