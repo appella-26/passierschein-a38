@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+
+<html class="h-full bg-background" lang="de"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_stack" name="shell-type"/><title>Appella Detail</title><link href="https://fonts.googleapis.com" rel="preconnect"/><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/><link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{margin:0;padding:0;min-height:100%;}.pb-safe{padding-bottom:calc(env(safe-area-inset-bottom,0px) + 1.5rem);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "secondary-fixed": "#b1f0ce", "tertiary": "#381a00", "on-secondary-fixed-variant": "#0e5138", "tertiary-fixed-dim": "#ffb77d", "on-tertiary-container": "#ed861e", "error-container": "#ffdad6", "secondary-container": "#aeeecb", "primary-fixed-dim": "#aecae1", "primary": "#042436", "inverse-surface": "#2f3130", "outline": "#73787d", "on-tertiary-fixed": "#2f1500", "surface-container-high": "#e9e8e6", "surface-container-low": "#f4f3f1", "on-surface": "#1a1c1b", "on-secondary-container": "#316e52", "surface-container": "#efeeec", "background": "#faf9f7", "surface-tint": "#466275", "primary-fixed": "#cae6fd", "primary-container": "#1e3a4c", "surface-container-lowest": "#ffffff", "on-secondary": "#ffffff", "tertiary-fixed": "#ffdcc3", "on-tertiary-fixed-variant": "#6e3900", "surface": "#faf9f7", "inverse-primary": "#aecae1", "on-error-container": "#93000a", "on-primary": "#ffffff", "outline-variant": "#c2c7cc", "surface-dim": "#dadad8", "surface-bright": "#faf9f7", "secondary": "#2c694e", "on-secondary-fixed": "#002114", "tertiary-container": "#572c00", "on-tertiary": "#ffffff", "secondary-fixed-dim": "#95d4b3", "on-primary-fixed-variant": "#2e4a5c", "inverse-on-surface": "#f1f1ef", "on-surface-variant": "#42474c", "on-background": "#1a1c1b", "surface-container-highest": "#e3e2e0", "surface-variant": "#e3e2e0", "on-primary-fixed": "#001e2e", "on-primary-container": "#88a4b9", "error": "#ba1a1a", "on-error": "#ffffff" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "space-xl": "2.25rem", "space-xs": "0.25rem", "space-md": "1rem", "margin-desktop": "3rem", "margin-tablet": "2rem", "margin": "1rem", "gutter": "1rem", "gutter-tablet": "1.5rem", "space-sm": "0.5rem", "gutter-desktop": "2rem", "space-lg": "1.5rem" }, fontFamily: { "headline-lg": ["Newsreader"], "label-lg": ["Plus Jakarta Sans"], "headline-md": ["Newsreader"], "body-md": ["Plus Jakarta Sans"], "label-sm": ["Plus Jakarta Sans"], "headline-xl": ["Newsreader"], "body-sm": ["Plus Jakarta Sans"], "headline-xl-mobile": ["Newsreader"], "headline-lg-mobile": ["Newsreader"], "label-md": ["Plus Jakarta Sans"], "body-lg": ["Plus Jakarta Sans"], "headline-sm": ["Newsreader"] }, fontSize: { "headline-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.015em", fontWeight: "600" }], "label-lg": ["14px", { lineHeight: "20px", letterSpacing: "0.01em", fontWeight: "600" }], "headline-md": ["22px", { lineHeight: "30px", fontWeight: "500" }], "body-md": ["15px", { lineHeight: "24px", fontWeight: "400" }], "label-sm": ["11px", { lineHeight: "14px", letterSpacing: "0.04em", fontWeight: "700" }], "headline-xl": ["40px", { lineHeight: "48px", letterSpacing: "-0.02em", fontWeight: "600" }], "body-sm": ["13px", { lineHeight: "20px", fontWeight: "400" }], "headline-xl-mobile": ["30px", { lineHeight: "38px", letterSpacing: "-0.015em", fontWeight: "600" }], "headline-lg-mobile": ["24px", { lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600" }], "label-md": ["12px", { lineHeight: "16px", letterSpacing: "0.02em", fontWeight: "600" }], "body-lg": ["17px", { lineHeight: "28px", fontWeight: "400" }], "headline-sm": ["18px", { lineHeight: "26px", fontWeight: "500" }] } } } };</script></head><body class="bg-surface font-body-md text-on-surface antialiased min-h-screen flex justify-center selection:bg-secondary-fixed selection:text-on-secondary-fixed"><div class="w-full max-w-[390px] min-h-screen flex flex-col relative bg-surface shadow-[0_4px_24px_-4px_rgba(4,36,54,0.06)]"><header class="fixed top-0 w-full max-w-[390px] z-50 bg-surface/90 backdrop-blur-xl pt-safe shadow-[0_1px_8px_rgba(4,36,54,0.04)]"><div class="h-16 px-4 flex items-center justify-between"><div class="flex items-center gap-2"><button aria-label="Zurück" class="w-10 h-10 -ml-1 flex items-center justify-center text-primary rounded-xl active:bg-surface-container-high transition-colors" onclick="history.back()"><span class="material-symbols-outlined text-[22px]">arrow_back</span></button><div class="w-8 h-8 rounded-lg bg-primary text-on-primary flex items-center justify-center font-headline-sm font-bold text-[18px]">A</div><div class="flex flex-col min-w-0"><h1 class="font-headline-sm text-headline-sm text-primary tracking-tight truncate leading-tight">Appella</h1><span class="font-label-sm text-[10px] text-on-surface-variant uppercase tracking-wider">Bescheid-Details</span></div></div><div class="flex items-center gap-1.5"><div class="flex items-center bg-surface-container rounded-lg p-0.5"><button class="px-2 py-0.5 rounded text-[11px] font-bold bg-surface-container-lowest text-primary shadow-sm">DE</button><button class="px-2 py-0.5 rounded text-[11px] font-medium text-on-surface-variant hover:text-primary transition-colors">EN</button></div><button aria-label="Bürger-Profil" class="w-9 h-9 rounded-xl bg-surface-container flex items-center justify-center text-primary active:scale-95 transition-transform"><span class="material-symbols-outlined text-[20px]">account_circle</span></button></div></div></header><main class="flex-1 w-full pt-16 pb-safe px-4 bg-surface flex flex-col"><div class="flex flex-col w-full pb-6 space-y-4">
+<!-- Top Utility Context Bar -->
+<div class="flex items-center justify-between pt-1">
+<div class="flex items-center space-x-2">
+<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-error-container text-on-error-container font-label-sm text-label-sm uppercase tracking-wider">
+        Frist: Noch 11 Tage
+      </span>
+<span class="text-on-surface-variant font-body-sm text-body-sm">
+        Az: 38/204/10492
+      </span>
+</div>
+<div class="flex items-center space-x-1">
+<button aria-label="Teilen" class="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-container text-primary active:scale-95 transition-transform" type="button">
+<span class="material-symbols-outlined text-[20px]">share</span>
+</button>
+<button aria-label="Favorit" class="w-10 h-10 flex items-center justify-center rounded-xl bg-surface-container text-primary active:scale-95 transition-transform" type="button">
+<span class="material-symbols-outlined text-[20px]">bookmark</span>
+</button>
+</div>
+</div>
+<!-- Document Meta Headline -->
+<div class="space-y-1">
+<p class="font-label-md text-label-md text-secondary font-semibold uppercase tracking-wider">Finanzamt Mannheim-Stadt</p>
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile text-primary leading-tight">Einkommensteuerbescheid 2024</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Eingegangen am 18. Oktober 2025 • Postzustellungsurkunde</p>
+</div>
+<!-- Segmented View Mode Toggle -->
+<div class="p-1 rounded-2xl bg-surface-container flex items-center space-x-1">
+<button class="flex-1 py-2 rounded-xl text-center font-label-md text-label-md transition-all shadow-sm bg-surface-container-lowest text-primary font-bold" id="tab-scan" onclick="switchView('scan')" type="button">
+      Scan (2)
+    </button>
+<button class="flex-1 py-2 rounded-xl text-center font-label-md text-label-md transition-all text-on-surface-variant hover:text-on-surface font-medium" id="tab-summary" onclick="switchView('summary')" type="button">
+      Fakten
+    </button>
+<button class="flex-1 py-2 rounded-xl text-center font-label-md text-label-md transition-all text-on-surface-variant hover:text-on-surface font-medium" id="tab-graph" onclick="switchView('graph')" type="button">
+      Wissensnetz
+    </button>
+</div>
+<!-- VIEW 1: Document Scanner Carousel -->
+<section class="space-y-3 block" id="view-scan">
+<div class="relative w-full rounded-2xl bg-surface-container-high overflow-hidden shadow-sm aspect-[3/4] flex flex-col justify-between p-3">
+<!-- Top floating badges -->
+<div class="flex items-center justify-between z-10">
+<span class="px-2.5 py-1 rounded-full bg-primary/80 backdrop-blur text-on-primary font-label-sm text-label-sm" id="page-counter-badge">
+          Seite 1 von 2
+        </span>
+<div class="flex items-center space-x-1">
+<button class="w-9 h-9 rounded-full bg-surface-container-lowest/90 backdrop-blur shadow-sm text-primary flex items-center justify-center active:scale-90 transition-transform" onclick="triggerZoomModal()" type="button">
+<span class="material-symbols-outlined text-[19px]">zoom_in</span>
+</button>
+<button class="w-9 h-9 rounded-full bg-surface-container-lowest/90 backdrop-blur shadow-sm text-primary flex items-center justify-center active:scale-90 transition-transform" onclick="triggerScanRotate()" type="button">
+<span class="material-symbols-outlined text-[19px]">crop_free</span>
+</button>
+</div>
+</div>
+<!-- Scanned Document Image Carousel Container -->
+<div class="relative flex-1 my-2 overflow-hidden rounded-xl bg-surface-container-lowest flex items-center justify-center">
+<!-- Page 1 Image -->
+<div class="absolute inset-0 transition-opacity duration-300 opacity-100 flex items-center justify-center p-2" id="scan-page-1">
+<img class="w-full h-full object-contain rounded-lg" data-alt="High-resolution tactile top-down scan of official German tax notification letter from Finanzamt Mannheim on thick creamy off-white bond paper. Visible federal eagle watermark, official typography with typed columns, blue stamp ink, and crisp German bureaucratic formatting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAOlYHn_3UU8luFpFj2gq3Byq7gMP1sKKq6-ypGY2xhmmfhKvAej-F3zpHuy-JWQZoLqMkuS-JHopVA2t0dYWx4E0EpdQ2shEQ7kurWOQz1Q5mMOUFLfJaDBpr7YoA5Wv8tsJDggFjJg4_7PV8I2AAPuKdHtowO1qvRDeLisJdQq8OmTAB-i45D_5Yv12B83_zi4jZyqbtug00oO0LF8L0fv2HyVCnReIoSnYUXFAFqfGh_ZCQXXMI"/>
+</div>
+<!-- Page 2 Image -->
+<div class="absolute inset-0 transition-opacity duration-300 opacity-0 pointer-events-none flex items-center justify-center p-2" id="scan-page-2">
+<img class="w-full h-full object-contain rounded-lg" data-alt="High-resolution legal calculation table second page of tax notice from German tax office. Detailed table breakdown of home office Werbungskosten expenses, deductions, stamp seals, and statutory Rechtsbehelfsbelehrung text on cream textured stationery paper." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBGjRB5o7nvNsGhEzu0U6cIgs7_rt7Xe6sctMe2hbpa4wcaL_cuS_odrsmz85UsfD1De6i2JR4Z4DRKjmfbxbCIx7QufOarTeKT4IpB3w1f7pbKBHfnzrKzm15YirG0wD7KTBWNd1ykAunSz7OjnZX4SxCZLG3IiusGi7ZKootsoES-sqcKITSy-YLODFxmwRnwDJ_LCeXk-mOY__yPzb2wv3Nd8VTUYN1EMmu9p_D1wfSFhnF8iqY"/>
+</div>
+<!-- OCR Hotspot Overlay Pill -->
+<div class="absolute bottom-3 left-3 right-3 bg-surface-container-lowest/95 backdrop-blur-md px-3 py-2 rounded-xl shadow-sm flex items-center justify-between"><div class="flex items-center space-x-2 min-w-0"><span class="w-2 h-2 rounded-full bg-secondary"></span><span class="font-label-sm text-label-sm text-primary truncate">Vollständig lesbar &amp; geprüft</span></div><div class="flex items-center space-x-1 text-secondary"><span class="material-symbols-outlined text-[18px]">check_circle</span><span class="font-label-sm text-label-sm font-semibold">Rechtsgültig</span></div></div>
+</div>
+<!-- Pagination Thumbnail Navigation Strip -->
+<div class="flex items-center justify-between z-10 px-1 pt-1">
+<div class="flex items-center space-x-2">
+<button class="w-12 h-16 rounded-lg overflow-hidden ring-2 ring-primary p-0.5 bg-surface-container-lowest transition-all" id="thumb-btn-1" onclick="selectPage(1)" type="button">
+<img class="w-full h-full object-cover rounded" data-alt="Micro thumbnail scan of page 1 of official German tax statement paper with letterhead." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBV5FyK_jqm-bAG-fa0tCEUfCVs59wULjrSCTNHlm001jrdiQUhwAcL33jd8tJ1i-asT2iDy6gHu3J3cN7Hu4-SsUUzROH9fI23vo6Ox-90hVwH1MFvIpDY6rDveGu0uQOvIRA8i-6MN2_V9UJsS3dtd70uhVOPXAXAlJ5BDxnu3Njyyit4VTEV_kxcxgAg61bYpu6qwJG1cw1vwtaSkLTuEeWdHpnW6HFnsIJdikZFTymLW9D-MFo"/>
+</button>
+<button class="w-12 h-16 rounded-lg overflow-hidden opacity-60 p-0.5 bg-surface-container-lowest transition-all" id="thumb-btn-2" onclick="selectPage(2)" type="button">
+<img class="w-full h-full object-cover rounded" data-alt="Micro thumbnail scan of page 2 of tax calculation ledger sheets and legal clauses." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDBLoB_eGhkv4gk4VrNBOzQIjoaTb445hbaAU3_wqoDJUC4AAdVvMzoj80N_vxxCkNIn82_9Qv3DcVyXP08SNL3WbfpCvqOyuKIbTuCus-cfl1uEBjmRuI1cXCbQdTTX3VLI4KxEMmSqXLBf55_2MYhBkXrBo3Hu1eWZQN6_Wdy4ZA7hdO6r8wjdmvzVxDLHK5rhyL-s_PNqAYE7HPqwc4efJ8Zn2HYkDllfxR6Ma5ZqovzFe3MpX0"/>
+</button>
+</div>
+<div class="flex items-center space-x-1">
+<button class="w-9 h-9 rounded-xl bg-surface-container-lowest text-primary flex items-center justify-center shadow-sm active:scale-95" onclick="prevScanPage()" type="button">
+<span class="material-symbols-outlined text-[18px]">chevron_left</span>
+</button>
+<button class="w-9 h-9 rounded-xl bg-surface-container-lowest text-primary flex items-center justify-center shadow-sm active:scale-95" onclick="nextScanPage()" type="button">
+<span class="material-symbols-outlined text-[18px]">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+</section>
+<!-- VIEW 2: Deep Analysis & Legal Facts Accordion -->
+<section class="space-y-3" id="view-summary">
+<!-- Deadline Alert Card -->
+<div class="rounded-2xl bg-tertiary-container text-on-tertiary p-4 space-y-2 shadow-sm relative overflow-hidden">
+<div class="flex items-start justify-between">
+<div class="flex items-center space-x-2">
+<span class="material-symbols-outlined text-tertiary-fixed-dim text-[20px]">warning</span>
+<span class="font-label-md text-label-md text-tertiary-fixed-dim uppercase tracking-wider">Achtung: Bindende Frist</span>
+</div>
+<span class="font-headline-sm text-headline-sm text-tertiary-fixed font-bold">18. Nov 2025</span>
+</div>
+<p class="font-body-md text-body-md text-tertiary-fixed">
+        Die Frist für einen Einspruch gegen die Streichung der Homeoffice-Pauschale endet in <span class="font-bold underline decoration-tertiary-fixed-dim">11 Kalendertagen</span>.
+      </p>
+</div>
+<!-- Accordion 1: Legal Remedy Instruction (§ 355 AO) -->
+<div class="rounded-2xl bg-surface-container-lowest p-4 shadow-sm space-y-3 transition-all">
+<button class="w-full flex items-center justify-between text-left" onclick="toggleAccordion('legal-content', 'legal-icon')" type="button">
+<div class="flex items-center space-x-2.5">
+<div class="w-8 h-8 rounded-lg bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-[20px]">gavel</span>
+</div>
+<div>
+<h3 class="font-label-lg text-label-lg text-primary">Rechtsbehelfsbelehrung</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Gemäß § 355 Abgabenordnung (AO)</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline transition-transform duration-200" id="legal-icon">expand_less</span>
+</button>
+<div class="space-y-2.5 pt-1 block" id="legal-content">
+<div class="p-3 rounded-xl bg-surface-container-low text-on-surface space-y-1.5">
+<p class="font-body-sm text-body-sm text-primary font-medium">
+            „Gegen diesen Bescheid ist der Einspruch statthaft. Der Einspruch ist innerhalb eines Monats nach Bekanntgabe schriftlich oder zur Niederschrift bei dem vorbezeichneten Finanzamt einzureichen.“
+          </p>
+<div class="flex items-center space-x-1.5 text-secondary"><span class="material-symbols-outlined text-[16px]">verified_user</span><span class="font-label-sm text-label-sm">Geprüfte Vorlage in Appella hinterlegt</span></div>
+</div>
+<button class="w-full py-2.5 px-3 rounded-xl bg-surface-container text-primary font-label-md text-label-md flex items-center justify-center space-x-2 active:bg-surface-container-high transition-colors" type="button">
+<span class="material-symbols-outlined text-[18px]">draw</span>
+<span class="">Widerspruchsschreiben vorbereiten</span>
+</button>
+</div>
+</div>
+<!-- Accordion 2: Bank Transfer & Payment Reference -->
+<div class="rounded-2xl bg-surface-container-lowest p-4 shadow-sm space-y-3 transition-all">
+<button class="w-full flex items-center justify-between text-left" onclick="toggleAccordion('iban-content', 'iban-icon')" type="button">
+<div class="flex items-center space-x-2.5">
+<div class="w-8 h-8 rounded-lg bg-secondary-container flex items-center justify-center text-on-secondary-container">
+<span class="material-symbols-outlined text-[20px]">account_balance</span>
+</div>
+<div>
+<h3 class="font-label-lg text-label-lg text-primary">Zahlungsverbindung &amp; Referenz</h3>
+<p class="font-body-sm text-body-sm text-secondary font-semibold">Erstattung: +412,80 € (Guthaben)</p>
+</div>
+</div>
+<span class="material-symbols-outlined text-outline transition-transform duration-200" id="iban-icon">expand_more</span>
+</button>
+<div class="space-y-3 pt-1 hidden" id="iban-content">
+<div class="p-3 rounded-xl bg-surface-container-low space-y-2">
+<div class="flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant">IBAN Landesoberkasse BW</span>
+<span class="font-label-sm text-label-sm text-secondary font-bold">Verifiziert</span>
+</div>
+<div class="flex items-center justify-between bg-surface-container-lowest px-3 py-2 rounded-lg">
+<span class="font-label-md text-label-md font-mono text-primary tracking-wide">DE89 6705 0505 0001 2345 67</span>
+<button class="text-primary hover:text-secondary p-1 flex items-center" onclick="copyValue('DE89670505050001234567', this)" type="button">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+</div>
+<div class="flex items-center justify-between pt-1">
+<div class="space-y-0.5">
+<span class="font-label-sm text-label-sm text-on-surface-variant">BIC</span>
+<p class="font-label-md text-label-md font-mono text-primary">MARKDE66XXX</p>
+</div>
+<div class="space-y-0.5 text-right">
+<span class="font-label-sm text-label-sm text-on-surface-variant">Verwendungszweck</span>
+<p class="font-label-md text-label-md font-mono text-primary">38/204/10492 ESt 24</p>
+</div>
+</div>
+</div>
+<button class="w-full py-2.5 rounded-xl bg-primary text-on-primary font-label-md text-label-md flex items-center justify-center space-x-1.5 active:scale-[0.99] transition-transform" onclick="copyValue('38/204/10492 ESt 24', this)" type="button">
+<span class="material-symbols-outlined text-[18px]">copy_all</span>
+<span class="">Verwendungszweck &amp; IBAN kopieren</span>
+</button>
+</div>
+</div>
+</section>
+<!-- VIEW 3: Interactive Knowledge Graph (Behörden- & Akten-Wissensnetz) -->
+<section class="space-y-3" id="view-graph">
+<div class="rounded-2xl bg-surface-container-lowest p-4 shadow-sm space-y-3">
+<div class="flex items-start justify-between">
+<div>
+<div class="flex items-center space-x-1.5">
+<span class="material-symbols-outlined text-secondary text-[20px]">hub</span>
+<h3 class="font-headline-sm text-headline-sm text-primary">Verknüpftes Wissensnetz</h3>
+</div>
+<p class="font-body-sm text-body-sm text-on-surface-variant mt-0.5">
+            Interaktive Aktenbeziehungen dieses Bescheids
+          </p>
+</div>
+<button class="px-2 py-1 rounded-lg bg-surface-container text-on-surface-variant font-label-sm text-label-sm hover:text-primary" onclick="resetGraphSelection()" type="button">
+          Reset
+        </button>
+</div>
+<!-- Graph Canvas Visualizer -->
+<div class="relative w-full h-80 rounded-xl bg-surface-container-low overflow-hidden p-2 flex items-center justify-center">
+<!-- SVG Connecting Edges -->
+<svg class="absolute inset-0 w-full h-full pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+<!-- Line Center to Authority -->
+<line stroke="#C2C7CC" stroke-dasharray="3,3" stroke-width="2" x1="50%" x2="50%" y1="50%" y2="20%"></line>
+<!-- Line Center to Tax-ID -->
+<line stroke="#C2C7CC" stroke-width="2" x1="50%" x2="18%" y1="50%" y2="76%"></line>
+<!-- Line Center to Prior Letter -->
+<line stroke="#C2C7CC" stroke-width="2" x1="50%" x2="82%" y1="50%" y2="76%"></line>
+<!-- Line Center to Homeoffice Topic -->
+<line stroke="#C2C7CC" stroke-dasharray="4,2" stroke-width="2" x1="50%" x2="82%" y1="50%" y2="24%"></line>
+</svg>
+<!-- Node: Top - Finanzamt Mannheim (Authority) -->
+<button class="absolute top-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-surface-container-lowest shadow-sm flex items-center space-x-1.5 active:scale-95 transition-all text-left" id="node-authority" onclick="selectGraphNode('Finanzamt Mannheim-Stadt', 'Behörde mit 4 archivierten Vorgängen seit 2022', 'account_balance', 'bg-primary-container text-on-primary-container')" type="button">
+<span class="w-6 h-6 rounded-full bg-primary flex items-center justify-center text-on-primary text-[13px]">
+<span class="material-symbols-outlined text-[14px]">account_balance</span>
+</span>
+<div class="flex flex-col">
+<span class="font-label-sm text-label-sm text-primary font-bold">Finanzamt Mannheim</span>
+<span class="font-body-sm text-[10px] leading-tight text-on-surface-variant">Stammbehörde</span>
+</div>
+</button>
+<!-- Node: Center - Alex (Du) -->
+<div class="z-20 w-16 h-16 rounded-full bg-primary text-on-primary flex flex-col items-center justify-center shadow-md ring-4 ring-primary-fixed/40">
+<span class="material-symbols-outlined text-[20px]">person</span>
+<span class="font-label-sm text-label-sm font-bold">Du</span>
+</div>
+<!-- Node: Bottom Left - Steuer-ID -->
+<button class="absolute bottom-4 left-3 px-2.5 py-1.5 rounded-xl bg-surface-container-lowest shadow-sm flex items-center space-x-1.5 active:scale-95 transition-all text-left max-w-[135px]" id="node-id" onclick="selectGraphNode('Steuer-ID 37 012 345 67', 'Dauerhafte bundesweite Identifikationsnummer (Alex)', 'badge', 'bg-secondary-container text-on-secondary-container')" type="button">
+<span class="w-5 h-5 rounded-md bg-secondary flex items-center justify-center text-on-secondary text-[12px]">
+<span class="material-symbols-outlined text-[13px]">badge</span>
+</span>
+<div class="flex flex-col min-w-0">
+<span class="font-label-sm text-label-sm text-primary truncate font-bold">ID 37 012 345</span>
+<span class="font-body-sm text-[10px] leading-tight text-on-surface-variant">Identifikator</span>
+</div>
+</button>
+<!-- Node: Bottom Right - Prior Letter -->
+<button class="absolute bottom-4 right-3 px-2.5 py-1.5 rounded-xl bg-surface-container-lowest shadow-sm flex items-center space-x-1.5 active:scale-95 transition-all text-left max-w-[145px]" id="node-prior" onclick="selectGraphNode('Vorbescheid Einkommensteuer 2024', 'Eingegangen 3. September 2025. Vorheriger Prüfschritt mit Nachforderungsbitte.', 'mail', 'bg-surface-container-highest text-primary')" type="button">
+<span class="w-5 h-5 rounded-md bg-surface-container-high flex items-center justify-center text-primary text-[12px]">
+<span class="material-symbols-outlined text-[13px]">mail</span>
+</span>
+<div class="flex flex-col min-w-0">
+<span class="font-label-sm text-label-sm text-primary truncate font-bold">Vorbescheid 2024</span>
+<span class="font-body-sm text-[10px] leading-tight text-on-surface-variant">3. Sep 2025</span>
+</div>
+</button>
+<!-- Node: Top Right - Homeoffice Topic -->
+<button class="absolute top-7 right-3 px-2.5 py-1.5 rounded-xl bg-surface-container-lowest shadow-sm flex items-center space-x-1.5 active:scale-95 transition-all text-left max-w-[130px]" id="node-topic" onclick="selectGraphNode('Werbungskosten Homeoffice', 'Strittiger Posten über 1.260 € Pauschale, der nicht anerkannt wurde.', 'home_work', 'bg-tertiary-container text-on-tertiary')" type="button">
+<span class="w-5 h-5 rounded-md bg-tertiary flex items-center justify-center text-on-tertiary text-[12px]">
+<span class="material-symbols-outlined text-[13px]">home_work</span>
+</span>
+<div class="flex flex-col min-w-0">
+<span class="font-label-sm text-label-sm text-primary truncate font-bold">Homeoffice</span>
+<span class="font-body-sm text-[10px] leading-tight text-tertiary font-semibold">1.260 € offen</span>
+</div>
+</button>
+</div>
+<!-- Graph Context Card / Inspector Drawer -->
+<div class="p-3.5 rounded-xl bg-surface-container flex items-start space-x-3 transition-all" id="graph-inspector">
+<div class="w-8 h-8 rounded-lg bg-surface-container-high text-primary flex items-center justify-center flex-shrink-0" id="inspector-badge">
+<span class="material-symbols-outlined text-[18px]" id="inspector-icon">touch_app</span>
+</div>
+<div class="space-y-0.5 flex-1 min-w-0">
+<h4 class="font-label-md text-label-md text-primary font-bold" id="inspector-title">Interaktive Knotenansicht</h4>
+<p class="font-body-sm text-body-sm text-on-surface-variant leading-relaxed" id="inspector-desc">Wähle einen Eintrag aus, um verbundene Unterlagen, Fristen und Vorgänger-Bescheide übersichtlich einzusehen.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Sticky Actions Bar -->
+<div class="pt-2 space-y-2"><div class="pt-3 space-y-2.5"><button class="w-full h-12 rounded-xl bg-primary text-on-primary font-label-lg text-label-lg flex items-center justify-center space-x-2 shadow-sm active:scale-[0.99] transition-transform" onclick="startCallAssistant()" type="button"><span class="material-symbols-outlined text-[20px]">support_agent</span><span>Bürger-Assistent: Rückfrage vorbereiten</span></button><div class="grid grid-cols-2 gap-2.5"><button class="h-11 rounded-xl bg-surface-container-high text-primary font-label-md text-label-md flex items-center justify-center space-x-2 active:bg-surface-variant transition-colors" onclick="exportPDF()" type="button"><span class="material-symbols-outlined text-[18px]">download</span><span class="">PDF speichern</span></button><button class="h-11 rounded-xl bg-surface-container-high text-primary font-label-md text-label-md flex items-center justify-center space-x-2 active:bg-surface-variant transition-colors" onclick="shareFolder()" type="button"><span class="material-symbols-outlined text-[18px]">folder</span><span class="">Akte ordnen</span></button></div></div></div>
+<!-- Toast Feedback Element -->
+<div class="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-primary text-on-primary px-4 py-2 rounded-full font-label-md text-label-md shadow-lg opacity-0 pointer-events-none transition-all duration-300 flex items-center space-x-2" id="toast-pill">
+<span class="material-symbols-outlined text-secondary-fixed text-[18px]">check_circle</span>
+<span class="" id="toast-text">Kopiert!</span>
+</div>
+</div>
+<script>
+  // Tab switching state
+  function switchView(tabKey) {
+    const tabs = ['scan', 'summary', 'graph'];
+    tabs.forEach(key => {
+      const btn = document.getElementById(`tab-${key}`);
+      const sec = document.getElementById(`view-${key}`);
+      if (key === tabKey) {
+        btn.classList.add('bg-surface-container-lowest', 'text-primary', 'font-bold', 'shadow-sm');
+        btn.classList.remove('text-on-surface-variant', 'font-medium');
+        if (sec) sec.classList.remove('hidden');
+      } else {
+        btn.classList.remove('bg-surface-container-lowest', 'text-primary', 'font-bold', 'shadow-sm');
+        btn.classList.add('text-on-surface-variant', 'font-medium');
+        if (sec) sec.classList.add('hidden');
+      }
+    });
+  }
+
+  // Scan pagination state
+  let currentPage = 1;
+  function selectPage(pageNum) {
+    currentPage = pageNum;
+    const p1 = document.getElementById('scan-page-1');
+    const p2 = document.getElementById('scan-page-2');
+    const thumb1 = document.getElementById('thumb-btn-1');
+    const thumb2 = document.getElementById('thumb-btn-2');
+    const badge = document.getElementById('page-counter-badge');
+
+    if (pageNum === 1) {
+      p1.classList.remove('opacity-0', 'pointer-events-none');
+      p1.classList.add('opacity-100');
+      p2.classList.remove('opacity-100');
+      p2.classList.add('opacity-0', 'pointer-events-none');
+
+      thumb1.classList.add('ring-2', 'ring-primary', 'opacity-100');
+      thumb2.classList.remove('ring-2', 'ring-primary');
+      thumb2.classList.add('opacity-60');
+      badge.textContent = 'Seite 1 von 2';
+    } else {
+      p2.classList.remove('opacity-0', 'pointer-events-none');
+      p2.classList.add('opacity-100');
+      p1.classList.remove('opacity-100');
+      p1.classList.add('opacity-0', 'pointer-events-none');
+
+      thumb2.classList.add('ring-2', 'ring-primary', 'opacity-100');
+      thumb1.classList.remove('ring-2', 'ring-primary');
+      thumb1.classList.add('opacity-60');
+      badge.textContent = 'Seite 2 von 2';
+    }
+  }
+
+  function prevScanPage() {
+    selectPage(1);
+  }
+
+  function nextScanPage() {
+    selectPage(2);
+  }
+
+  // Accordion toggle helper
+  function toggleAccordion(contentId, iconId) {
+    const el = document.getElementById(contentId);
+    const icon = document.getElementById(iconId);
+    const isHidden = el.classList.contains('hidden');
+    if (isHidden) {
+      el.classList.remove('hidden');
+      icon.textContent = 'expand_less';
+    } else {
+      el.classList.add('hidden');
+      icon.textContent = 'expand_more';
+    }
+  }
+
+  // Knowledge Graph interactivity
+  function selectGraphNode(title, description, iconName, badgeClass) {
+    const titleEl = document.getElementById('inspector-title');
+    const descEl = document.getElementById('inspector-desc');
+    const iconEl = document.getElementById('inspector-icon');
+    const badgeEl = document.getElementById('inspector-badge');
+
+    titleEl.textContent = title;
+    descEl.textContent = description;
+    iconEl.textContent = iconName;
+    badgeEl.className = `w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${badgeClass}`;
+
+    showToast(`Knoten ausgewählt: ${title}`);
+  }
+
+  function resetGraphSelection() {
+    const titleEl = document.getElementById('inspector-title');
+    const descEl = document.getElementById('inspector-desc');
+    const iconEl = document.getElementById('inspector-icon');
+    const badgeEl = document.getElementById('inspector-badge');
+
+    titleEl.textContent = 'Interaktive Knotenansicht';
+    descEl.textContent = 'Tippe auf einen Knoten, um alle verknüpften Briefe mit diesem Aktenzeichen zu filtern oder vorherige Bescheide zu öffnen.';
+    iconEl.textContent = 'touch_app';
+    badgeEl.className = 'w-8 h-8 rounded-lg bg-surface-container-high text-primary flex items-center justify-center flex-shrink-0';
+  }
+
+  // Toast notifier
+  function showToast(message) {
+    const toast = document.getElementById('toast-pill');
+    const toastText = document.getElementById('toast-text');
+    toastText.textContent = message;
+    toast.classList.remove('opacity-0', 'pointer-events-none');
+    toast.classList.add('opacity-100');
+    setTimeout(() => {
+      toast.classList.add('opacity-0', 'pointer-events-none');
+      toast.classList.remove('opacity-100');
+    }, 2200);
+  }
+
+  // Copy helper
+  function copyValue(text, triggerEl) {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+    }
+    showToast(`${text} in Zwischenablage kopiert!`);
+  }
+
+  function triggerZoomModal() {
+    showToast('Vollbild-Vorschau aktiviert');
+  }
+
+  function triggerScanRotate() {
+    showToast('Dokument-Rahmen neu kalibriert');
+  }
+
+  function startCallAssistant() {
+    showToast('Bereite Telefonat mit Finanzamt vor...');
+  }
+
+  function exportPDF() {
+    showToast('Generiere durchsuchbares PDF mit OCR-Schicht...');
+  }
+
+  function shareFolder() {
+    showToast('Akte „Steuern 2024“ zugeordnet');
+  }
+</script></main></div>
+</body></html>

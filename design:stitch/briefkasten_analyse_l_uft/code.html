@@ -1,0 +1,132 @@
+<!DOCTYPE html><html class="h-full bg-background" lang="de"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"><meta content="mobile_tab" name="shell-type"><title>Briefkasten</title><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{margin:0;padding:0;min-height:100%;}.pb-safe{padding-bottom:calc(env(safe-area-inset-bottom,0px) + 5rem);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "secondary-fixed": "#b1f0ce", "tertiary": "#381a00", "on-secondary-fixed-variant": "#0e5138", "tertiary-fixed-dim": "#ffb77d", "on-tertiary-container": "#ed861e", "error-container": "#ffdad6", "secondary-container": "#aeeecb", "primary-fixed-dim": "#aecae1", "primary": "#042436", "inverse-surface": "#2f3130", "outline": "#73787d", "on-tertiary-fixed": "#2f1500", "surface-container-high": "#e9e8e6", "surface-container-low": "#f4f3f1", "on-surface": "#1a1c1b", "on-secondary-container": "#316e52", "surface-container": "#efeeec", "background": "#faf9f7", "surface-tint": "#466275", "primary-fixed": "#cae6fd", "primary-container": "#1e3a4c", "surface-container-lowest": "#ffffff", "on-secondary": "#ffffff", "tertiary-fixed": "#ffdcc3", "on-tertiary-fixed-variant": "#6e3900", "surface": "#faf9f7", "inverse-primary": "#aecae1", "on-error-container": "#93000a", "on-primary": "#ffffff", "outline-variant": "#c2c7cc", "surface-dim": "#dadad8", "surface-bright": "#faf9f7", "secondary": "#2c694e", "on-secondary-fixed": "#002114", "tertiary-container": "#572c00", "on-tertiary": "#ffffff", "secondary-fixed-dim": "#95d4b3", "on-primary-fixed-variant": "#2e4a5c", "inverse-on-surface": "#f1f1ef", "on-surface-variant": "#42474c", "on-background": "#1a1c1b", "surface-container-highest": "#e3e2e0", "surface-variant": "#e3e2e0", "on-primary-fixed": "#001e2e", "on-primary-container": "#88a4b9", "error": "#ba1a1a", "on-error": "#ffffff" }, borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, spacing: { "space-xl": "2.25rem", "space-xs": "0.25rem", "space-md": "1rem", "margin-desktop": "3rem", "margin-tablet": "2rem", "margin": "1rem", "gutter": "1rem", "gutter-tablet": "1.5rem", "space-sm": "0.5rem", "gutter-desktop": "2rem", "space-lg": "1.5rem" }, fontFamily: { "headline-lg": ["Newsreader"], "label-lg": ["Plus Jakarta Sans"], "headline-md": ["Newsreader"], "body-md": ["Plus Jakarta Sans"], "label-sm": ["Plus Jakarta Sans"], "headline-xl": ["Newsreader"], "body-sm": ["Plus Jakarta Sans"], "headline-xl-mobile": ["Newsreader"], "headline-lg-mobile": ["Newsreader"], "label-md": ["Plus Jakarta Sans"], "body-lg": ["Plus Jakarta Sans"], "headline-sm": ["Newsreader"] }, fontSize: { "headline-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.015em", fontWeight: "600" }], "label-lg": ["14px", { lineHeight: "20px", letterSpacing: "0.01em", fontWeight: "600" }], "headline-md": ["22px", { lineHeight: "30px", fontWeight: "500" }], "body-md": ["15px", { lineHeight: "24px", fontWeight: "400" }], "label-sm": ["11px", { lineHeight: "14px", letterSpacing: "0.04em", fontWeight: "700" }], "headline-xl": ["40px", { lineHeight: "48px", letterSpacing: "-0.02em", fontWeight: "600" }], "body-sm": ["13px", { lineHeight: "20px", fontWeight: "400" }], "headline-xl-mobile": ["30px", { lineHeight: "38px", letterSpacing: "-0.015em", fontWeight: "600" }], "headline-lg-mobile": ["24px", { lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600" }], "label-md": ["12px", { lineHeight: "16px", letterSpacing: "0.02em", fontWeight: "600" }], "body-lg": ["17px", { lineHeight: "28px", fontWeight: "400" }], "headline-sm": ["18px", { lineHeight: "26px", fontWeight: "500" }] } } } };</script><style>
+      @keyframes scan {
+        0% { top: 4%; opacity: 0; }
+        15% { opacity: 1; }
+        85% { opacity: 1; }
+        100% { top: 92%; opacity: 0; }
+      }
+    </style></head><body class="bg-surface font-body-md text-on-surface antialiased min-h-screen flex justify-center selection:bg-secondary-fixed selection:text-on-secondary-fixed"><div class="w-full max-w-[390px] min-h-screen flex flex-col relative bg-surface shadow-[0_4px_24px_-4px_rgba(4,36,54,0.06)]"><header class="fixed top-0 w-full max-w-[390px] z-50 bg-surface/90 backdrop-blur-xl pt-safe shadow-[0_1px_8px_rgba(4,36,54,0.04)]"><div class="h-20 px-4 flex flex-col justify-center gap-1.5"><div class="flex items-center justify-between"><div class="flex items-center gap-2"><div class="w-8 h-8 rounded-xl bg-primary flex items-center justify-center text-on-primary font-headline-sm text-[18px] font-bold shadow-sm select-none">A</div><div class="flex flex-col leading-none"><span class="font-headline-sm text-headline-sm text-primary tracking-tight">Appella</span><span class="font-label-sm text-[10px] text-outline tracking-wider uppercase">Bürger- &amp; Bescheid-Assistent</span></div></div><div class="flex items-center gap-2"><button class="inline-flex items-center bg-surface-container px-1.5 py-1 rounded-full text-[11px] font-label-md text-on-surface-variant" type="button"><span class="px-1.5 py-0.5 rounded-full bg-primary text-on-primary font-bold">DE</span><span class="px-1.5 py-0.5 text-on-surface-variant font-medium">EN</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div><div class="flex items-center justify-between"><div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-secondary-container/50 text-on-secondary-container"><span class="material-symbols-outlined text-[13px] text-secondary">lock</span><span class="font-label-sm text-[10px] tracking-normal font-semibold">Vertraulich &amp; geschützt auf Ihrem Gerät</span></div><span class="font-label-sm text-[10px] text-outline font-medium tracking-wide uppercase">Scannen</span></div></div></header><main class="flex-1 w-full pt-20 pb-safe px-4 bg-surface flex flex-col"><div class="flex flex-col w-full pb-8">
+<!-- Status Chip & Header Notice -->
+<div class="flex items-center justify-between mb-4">
+<div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-container-high text-on-surface">
+<span class="w-2 h-2 rounded-full bg-secondary animate-ping"></span>
+<span class="font-label-md text-label-md tracking-normal font-semibold">Analyse läuft</span>
+</div>
+<div class="inline-flex items-center gap-1.5 text-on-surface-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[16px]">lock</span>
+<span class="">100% Offline &amp; Privat</span>
+</div>
+</div>
+<!-- Letter Document Preview Card (Physical 3:4 Proportions) -->
+<div class="relative w-full aspect-[3/4] max-h-[360px] rounded-2xl bg-surface-container-lowest shadow-md overflow-hidden flex flex-col justify-between p-5 mb-5 select-none">
+<!-- Authentic German Bureaucracy Letter Graphic Simulation -->
+<div class="flex flex-col gap-3 opacity-80 pointer-events-none">
+<!-- Letterhead: Agency Details -->
+<div class="flex justify-between items-start">
+<div class="flex flex-col gap-1 max-w-[65%]">
+<div class="h-2.5 w-32 bg-on-surface/20 rounded"></div>
+<div class="h-2 w-24 bg-on-surface/10 rounded"></div>
+<div class="h-2 w-28 bg-on-surface/10 rounded"></div>
+<div class="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-surface-container text-on-surface-variant">
+<span class="font-label-sm text-[9px] uppercase font-bold tracking-wider">Finanzamt Mannheim-Stadt</span>
+</div>
+</div>
+<!-- Authentic Civic Seal (Blurred/Redacted aesthetic) -->
+<div class="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center relative overflow-hidden shadow-sm">
+<span class="material-symbols-outlined text-outline text-[26px] opacity-40">account_balance</span>
+<div class="absolute inset-0 bg-surface-container-high/60 backdrop-blur-[2px]"></div>
+<div class="absolute inset-1 rounded-full border border-dashed border-outline-variant/60"></div>
+</div>
+</div>
+<!-- Recipient Address Block & Reference Line -->
+<div class="flex flex-col gap-1.5 mt-2">
+<div class="h-2 w-20 bg-on-surface/15 rounded"></div>
+<div class="h-2 w-36 bg-on-surface/10 rounded"></div>
+<div class="h-1.5 w-48 bg-on-surface/10 rounded"></div>
+</div>
+<!-- Reference Code & Date -->
+<div class="flex justify-between items-center py-2 px-2.5 rounded bg-surface-container-low text-on-surface-variant mt-1">
+<span class="font-label-sm text-[10px] font-mono">AZ: 38/204/91823 · VZ 2023</span>
+<span class="font-label-sm text-[10px]">14. Mai 2024</span>
+</div>
+<!-- Document Body Lines (Obfuscated Paper Lines) -->
+<div class="flex flex-col gap-2 mt-2">
+<div class="h-2.5 w-4/5 bg-on-surface/25 rounded"></div>
+<div class="h-2 w-full bg-on-surface/15 rounded"></div>
+<div class="h-2 w-full bg-on-surface/15 rounded"></div>
+<div class="h-2 w-3/4 bg-on-surface/15 rounded"></div>
+<div class="h-2 w-5/6 bg-on-surface/15 rounded"></div>
+<div class="h-2 w-2/3 bg-on-surface/10 rounded"></div>
+</div>
+<!-- Official Stamp Simulation Block -->
+<div class="mt-3 flex items-center gap-3">
+<div class="px-2.5 py-1 rounded bg-error/10 flex items-center gap-1.5 transform -rotate-2">
+<span class="material-symbols-outlined text-error text-[14px]">warning</span>
+<span class="font-label-sm text-[9px] font-bold text-error uppercase tracking-wider">Fristsetzung / Bescheid</span>
+</div>
+</div>
+</div>
+<!-- Active Glowing Laser Scanning Line Overlay -->
+<div class="absolute inset-x-0 h-1 bg-gradient-to-r from-transparent via-secondary to-transparent shadow-[0_0_14px_3px_rgba(44,105,78,0.55)] animate-[scan_2.6s_ease-in-out_infinite] pointer-events-none"></div>
+<!-- Top Laser Indicator Badge -->
+<div class="absolute top-3 right-3 z-10 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary text-on-primary shadow-sm">
+<span class="material-symbols-outlined text-[13px] text-secondary-fixed animate-spin">sync</span>
+<span class="font-label-sm text-[10px] tracking-wide font-medium">Laser-Scan aktiv</span>
+</div>
+<!-- OCR Target Reticles in Corners -->
+<div class="absolute top-2 left-2 w-3 h-3 border-t-2 border-l-2 border-primary/30 pointer-events-none"></div>
+<div class="absolute bottom-2 left-2 w-3 h-3 border-b-2 border-l-2 border-primary/30 pointer-events-none"></div>
+<div class="absolute bottom-2 right-2 w-3 h-3 border-b-2 border-r-2 border-primary/30 pointer-events-none"></div>
+</div>
+<!-- Reassuring Microcopy Callout (Psychological relief) -->
+<div class="rounded-xl bg-secondary-container/40 p-3.5 mb-5 flex items-start gap-3 shadow-sm">
+<div class="w-7 h-7 rounded-full bg-secondary-container flex items-center justify-center shrink-0 mt-0.5">
+<span class="material-symbols-outlined text-secondary text-[17px]">spa</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-md text-label-md font-semibold text-on-secondary-container leading-tight mb-0.5">Ruhe bewahren</span>
+<p class="font-body-sm text-body-sm text-on-secondary-container leading-relaxed">
+        Keine Panik bei roten Stempeln oder Mahngebühren. Wir fassen den Brief gleich Schritt für Schritt zusammen.
+      </p>
+</div>
+</div>
+<!-- Step-by-Step AI Pipeline Status List -->
+<div class="rounded-2xl bg-surface-container-lowest p-4 shadow-sm flex flex-col gap-3.5 mb-4"><div class="flex items-center justify-between pb-1"><span class="font-label-md text-label-md font-bold text-primary tracking-wider uppercase">Dokument wird erfasst</span><span class="font-label-sm text-label-sm text-outline font-medium">2 von 4</span></div><div class="flex items-start gap-3"><div class="w-6 h-6 rounded-full bg-secondary text-on-secondary flex items-center justify-center shrink-0 mt-0.5"><span class="material-symbols-outlined text-[15px] font-bold">check</span></div><div class="flex flex-col flex-1 min-w-0"><span class="font-label-md text-label-md font-semibold text-on-surface">Dokument lesbar gemacht</span><span class="font-body-sm text-body-sm text-outline">Text und Struktur erfolgreich erkannt</span></div></div><div class="flex items-start gap-3"><div class="w-6 h-6 rounded-full bg-surface-container-high text-primary flex items-center justify-center shrink-0 mt-0.5 relative"><span class="w-4 h-4 rounded-full border-2 border-primary border-t-transparent animate-spin"></span></div><div class="flex flex-col flex-1 min-w-0"><div class="flex items-center gap-2"><span class="font-label-md text-label-md font-bold text-primary">Fristen &amp; Beträge ermittelt…</span></div><span class="font-body-sm text-body-sm text-secondary font-medium animate-pulse">Wichtige Termine und Zahlungsinformationen prüfen</span></div></div><div class="flex items-start gap-3 opacity-60"><div class="w-6 h-6 rounded-full bg-surface-container flex items-center justify-center shrink-0 mt-0.5"><div class="w-2 h-2 rounded-full bg-outline"></div></div><div class="flex flex-col flex-1 min-w-0"><span class="font-label-md text-label-md font-medium text-on-surface">Zusammenfassung vorbereitet…</span><span class="font-body-sm text-body-sm text-outline">Erklärung in verständlicher Sprache</span></div></div><div class="flex items-start gap-3 opacity-60"><div class="w-6 h-6 rounded-full bg-surface-container flex items-center justify-center shrink-0 mt-0.5"><div class="w-2 h-2 rounded-full bg-outline"></div></div><div class="flex flex-col flex-1 min-w-0"><span class="font-label-md text-label-md font-medium text-on-surface">Anruf-Option bereitgestellt…</span><span class="font-body-sm text-body-sm text-outline">Leitfaden für etwaige Rückfragen</span></div></div></div>
+<!-- Time & Local Model Indicator -->
+<div class="flex items-center justify-center gap-2 px-3 py-2 text-center text-outline mb-4"><span class="material-symbols-outlined text-[17px]">hourglass_top</span><span class="font-body-sm text-body-sm">Dauert nur wenige Sekunden…</span></div>
+<!-- Secondary Subtle Cancel Action -->
+<div class="flex flex-col items-center">
+<button aria-label="Scan abbrechen" class="inline-flex items-center justify-center px-6 py-2.5 rounded-xl bg-surface-container-high hover:bg-surface-container text-on-surface-variant transition-colors min-h-[48px] active:scale-[0.99]" id="cancelScanBtn" type="button">
+<span class="material-symbols-outlined text-[18px] mr-1.5">close</span>
+<span class="font-label-lg text-label-lg font-medium">Scan abbrechen</span>
+</button>
+</div>
+</div>
+<script>
+  // Dynamic scanning progression simulation to reinforce delight & responsiveness
+  (function() {
+    const cancelBtn = document.getElementById('cancelScanBtn');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', function() {
+        if (confirm('Möchten Sie die Analyse dieses Schreibens wirklich abbrechen?')) {
+          history.back();
+        }
+      });
+    }
+
+    // Keyframes for the precise laser scanning bar
+    const style = document.createElement('style');
+    style.innerHTML = `
+      @keyframes scan {
+        0% { top: 4%; opacity: 0; }
+        15% { opacity: 1; }
+        85% { opacity: 1; }
+        100% { top: 92%; opacity: 0; }
+      }
+    `;
+    document.head.appendChild(style);
+  })();
+</script></main><nav class="fixed bottom-0 w-full max-w-[390px] z-50 pb-safe bg-surface/90 backdrop-blur-xl shadow-[0_-2px_16px_rgba(4,36,54,0.05)]" data-active-classes="text-primary font-semibold"><div class="flex justify-around items-center h-16 px-2"><a aria-current="page" class="flex flex-col items-center justify-center min-w-[56px] min-h-[48px] py-1 transition-colors text-primary font-semibold" data-path="scannen" href="#"><span class="material-symbols-outlined text-[24px]">document_scanner</span><span class="font-label-sm text-[11px] mt-0.5">Scannen</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[48px] py-1 relative text-on-surface-variant hover:text-on-surface transition-colors" data-path="archiv" href="#"><div class="relative"><span class="material-symbols-outlined text-[24px]">folder_special</span><span class="absolute -top-1 -right-2 px-1.5 py-0.2 rounded-full bg-secondary text-on-secondary text-[10px] font-bold leading-tight">3</span></div><span class="font-label-sm text-[11px] mt-0.5">Archiv</span></a><a class="flex flex-col items-center justify-center min-w-[56px] min-h-[48px] py-1 text-on-surface-variant hover:text-on-surface transition-colors" data-path="netzwerk" href="#"><span class="material-symbols-outlined text-[24px]">hub</span><span class="font-label-sm text-[11px] mt-0.5">Wissensnetz</span></a></div></nav></div>
+
+</body></html>

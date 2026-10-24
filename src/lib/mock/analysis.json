@@ -1,0 +1,40 @@
+{
+  "document_type": "Einkommensteuerbescheid 2025",
+  "sender": { "name": "Finanzamt Mannheim-Stadt", "type": "authority", "phone": "+496212920", "email": null },
+  "letter_date": "2026-10-02",
+  "references": [
+    { "label": "Steuernummer", "value": "37 012 345 67" },
+    { "label": "Aktenzeichen", "value": "38/204/91823" }
+  ],
+  "summary": "Das Finanzamt hat Ihre Einkommensteuer für 2025 berechnet. Nach Abzug der bereits gezahlten Steuern bleiben 312,40 EUR offen. Überweisen Sie diesen Betrag bis zum 05.11.2026. Prüfen Sie die Berechnung: Wenn Sie einen Fehler vermuten, können Sie innerhalb eines Monats nach Bekanntgabe Einspruch einlegen; ein Einspruch allein setzt die Zahlungspflicht nicht aus.",
+  "urgency": "high",
+  "deadline": "2026-11-05",
+  "deadline_is_estimate": false,
+  "amount_due": "312,40 EUR",
+  "action_items": [
+    {
+      "title": "312,40 EUR bis zum 05.11.2026 überweisen",
+      "type": "pay",
+      "due": "2026-11-05",
+      "details": "Prüfen Sie die Bankverbindung im Originalbescheid. Geben Sie die Steuernummer 37 012 345 67 und den Veranlagungszeitraum 2025 als Verwendungszweck an.",
+      "phone": null, "phone_raw": null, "call_purpose_de": null
+    },
+    {
+      "title": "Steuerberechnung und Werbungskosten prüfen",
+      "type": "other",
+      "due": "2026-11-06",
+      "details": "Vergleichen Sie die festgesetzten Beträge mit Ihrer Steuererklärung. Die Einspruchsfrist wird hier aus dem Bescheiddatum und einer angenommenen Bekanntgabe nach vier Tagen geschätzt. Prüfen Sie die tatsächliche Bekanntgabe und die Rechtsbehelfsbelehrung.",
+      "phone": null, "phone_raw": null, "call_purpose_de": null
+    },
+    {
+      "title": "Finanzamt bei Unklarheiten anrufen",
+      "type": "call",
+      "due": "2026-11-05",
+      "details": "Halten Sie den Bescheid und Ihre Steuernummer bereit. Fragen Sie nach, wenn die Nachzahlung oder die anerkannten Werbungskosten nicht nachvollziehbar sind.",
+      "phone": "+496212920", "phone_raw": "0621 / 292-0",
+      "call_purpose_de": "Rückfrage zum Einkommensteuerbescheid 2025 und zur Nachzahlung von 312,40 Euro."
+    }
+  ],
+  "keywords": ["Einkommensteuer", "income tax", "Steuerbescheid", "tax assessment", "Nachzahlung", "back payment", "Einspruch", "appeal"],
+  "entities": [{ "type": "topic", "name": "Einkommensteuer 2025" }, { "type": "topic", "name": "Werbungskosten" }, { "type": "person", "name": "Sachbearbeiterin Müller" }]
+}

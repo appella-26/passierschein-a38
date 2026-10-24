@@ -1,0 +1,9 @@
+node_modules/
+.svelte-kit/
+.env
+# Real letters live here. NEVER commit.
+data/
+build/
+.DS_Store
+test-results/
+playwright-report/

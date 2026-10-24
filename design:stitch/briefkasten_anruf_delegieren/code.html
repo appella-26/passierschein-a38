@@ -1,0 +1,263 @@
+<!DOCTYPE html><html class="h-full bg-background" lang="de"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport">
+<meta content="mobile_stack" name="shell-type">
+<title>Anruf vorbereiten - Briefkasten</title>
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+    @layer base {
+      html, body {
+        margin: 0;
+        padding: 0;
+        min-height: 100%;
+      }
+      .pb-safe {
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1.25rem);
+      }
+      .pt-safe {
+        padding-top: env(safe-area-inset-top, 0px);
+      }
+    }
+    ::-webkit-scrollbar {
+      display: none;
+    }
+    body {
+      min-height: max(844px, 100dvh);
+    }
+  </style>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "secondary-fixed": "#b1f0ce",
+            "tertiary": "#381a00",
+            "on-secondary-fixed-variant": "#0e5138",
+            "tertiary-fixed-dim": "#ffb77d",
+            "on-tertiary-container": "#ed861e",
+            "error-container": "#ffdad6",
+            "secondary-container": "#aeeecb",
+            "primary-fixed-dim": "#aecae1",
+            "primary": "#042436",
+            "inverse-surface": "#2f3130",
+            "outline": "#73787d",
+            "on-tertiary-fixed": "#2f1500",
+            "surface-container-high": "#e9e8e6",
+            "surface-container-low": "#f4f3f1",
+            "on-surface": "#1a1c1b",
+            "on-secondary-container": "#316e52",
+            "surface-container": "#efeeec",
+            "background": "#faf9f7",
+            "surface-tint": "#466275",
+            "primary-fixed": "#cae6fd",
+            "primary-container": "#1e3a4c",
+            "surface-container-lowest": "#ffffff",
+            "on-secondary": "#ffffff",
+            "tertiary-fixed": "#ffdcc3",
+            "on-tertiary-fixed-variant": "#6e3900",
+            "surface": "#faf9f7",
+            "inverse-primary": "#aecae1",
+            "on-error-container": "#93000a",
+            "on-primary": "#ffffff",
+            "outline-variant": "#c2c7cc",
+            "surface-dim": "#dadad8",
+            "surface-bright": "#faf9f7",
+            "secondary": "#2c694e",
+            "on-secondary-fixed": "#002114",
+            "tertiary-container": "#572c00",
+            "on-tertiary": "#ffffff",
+            "secondary-fixed-dim": "#95d4b3",
+            "on-primary-fixed-variant": "#2e4a5c",
+            "inverse-on-surface": "#f1f1ef",
+            "on-surface-variant": "#42474c",
+            "on-background": "#1a1c1b",
+            "surface-container-highest": "#e3e2e0",
+            "surface-variant": "#e3e2e0",
+            "on-primary-fixed": "#001e2e",
+            "on-primary-container": "#88a4b9",
+            "error": "#ba1a1a",
+            "on-error": "#ffffff"
+          },
+          borderRadius: {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+          spacing: {
+            "space-xl": "2.25rem",
+            "space-xs": "0.25rem",
+            "space-md": "1rem",
+            "margin-desktop": "3rem",
+            "margin-tablet": "2rem",
+            "margin": "1rem",
+            "gutter": "1rem",
+            "gutter-tablet": "1.5rem",
+            "space-sm": "0.5rem",
+            "gutter-desktop": "2rem",
+            "space-lg": "1.5rem"
+          },
+          fontFamily: {
+            "headline-lg": ["Newsreader"],
+            "label-lg": ["Plus Jakarta Sans"],
+            "headline-md": ["Newsreader"],
+            "body-md": ["Plus Jakarta Sans"],
+            "label-sm": ["Plus Jakarta Sans"],
+            "headline-xl": ["Newsreader"],
+            "body-sm": ["Plus Jakarta Sans"],
+            "headline-xl-mobile": ["Newsreader"],
+            "headline-lg-mobile": ["Newsreader"],
+            "label-md": ["Plus Jakarta Sans"],
+            "body-lg": ["Plus Jakarta Sans"],
+            "headline-sm": ["Newsreader"]
+          },
+          fontSize: {
+            "headline-lg": ["32px", { lineHeight: "40px", letterSpacing: "-0.015em", fontWeight: "600" }],
+            "label-lg": ["14px", { lineHeight: "20px", letterSpacing: "0.01em", fontWeight: "600" }],
+            "headline-md": ["22px", { lineHeight: "30px", fontWeight: "500" }],
+            "body-md": ["15px", { lineHeight: "24px", fontWeight: "400" }],
+            "label-sm": ["11px", { lineHeight: "14px", letterSpacing: "0.04em", fontWeight: "700" }],
+            "headline-xl": ["40px", { lineHeight: "48px", letterSpacing: "-0.02em", fontWeight: "600" }],
+            "body-sm": ["13px", { lineHeight: "20px", fontWeight: "400" }],
+            "headline-xl-mobile": ["30px", { lineHeight: "38px", letterSpacing: "-0.015em", fontWeight: "600" }],
+            "headline-lg-mobile": ["24px", { lineHeight: "32px", letterSpacing: "-0.01em", fontWeight: "600" }],
+            "label-md": ["12px", { lineHeight: "16px", letterSpacing: "0.02em", fontWeight: "600" }],
+            "body-lg": ["17px", { lineHeight: "28px", fontWeight: "400" }],
+            "headline-sm": ["18px", { lineHeight: "26px", fontWeight: "500" }]
+          }
+        }
+      }
+    };
+  </script>
+</head>
+<body class="bg-[#121b22] font-body-md text-on-surface antialiased min-h-screen flex justify-center selection:bg-secondary-fixed selection:text-on-secondary-fixed">
+<!-- Mobile Screen Container -->
+<div class="w-full max-w-[390px] min-h-screen flex flex-col relative bg-surface-container shadow-2xl overflow-hidden">
+<!-- Top Modal Header -->
+<header class="sticky top-0 z-30 bg-surface-container-lowest border-b border-surface-container-high/80 pt-safe px-4 py-3 flex items-center justify-between shadow-sm">
+<div class="flex items-center gap-2.5">
+<button aria-label="Schließen" class="w-9 h-9 rounded-full bg-surface-container hover:bg-surface-container-high active:scale-95 flex items-center justify-center text-primary transition-all" onclick="history.back()" type="button">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+<h1 class="font-headline-sm text-headline-sm text-primary tracking-tight font-semibold">Anruf vorbereiten</h1>
+</div>
+<div class="inline-flex items-center gap-1.5 bg-secondary-fixed/70 text-on-secondary-fixed-variant px-2.5 py-1 rounded-full"><span class="material-symbols-outlined text-[14px]" style="font-variation-settings: &quot;FILL&quot; 1;">support_agent</span>
+<span class="font-label-sm text-[11px] font-bold tracking-wide uppercase">Telefon-Assistent</span></div>
+</header>
+<!-- Scrollable Modal Content -->
+<main class="flex-1 overflow-y-auto px-4 py-4 flex flex-col gap-3.5 bg-surface pb-6">
+<!-- Recipient Badge -->
+<div class="flex items-center justify-between bg-surface-container-lowest border border-surface-container-high rounded-xl p-3 shadow-xs">
+<div class="flex items-center gap-2.5 min-w-0">
+<div class="w-9 h-9 rounded-lg bg-surface-container flex items-center justify-center text-primary shrink-0">
+<span class="material-symbols-outlined text-[20px]">account_balance</span>
+</div>
+<div class="flex flex-col min-w-0">
+<span class="text-[10px] uppercase font-bold tracking-wider text-outline">Empfängerbehörde</span>
+<span class="font-label-lg text-primary text-[14px] font-semibold truncate">Finanzamt Mannheim-Stadt</span>
+</div>
+</div>
+<span class="inline-flex items-center gap-1 bg-secondary/10 text-secondary text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0">
+<span class="material-symbols-outlined text-[13px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+          Verifiziert
+        </span>
+</div>
+<!-- Field 1: Behörden-Rufnummer -->
+<div class="bg-surface-container-lowest border border-surface-container-high rounded-xl p-3.5 shadow-xs flex flex-col gap-1.5">
+<label class="font-label-sm text-[11px] text-on-surface-variant font-bold tracking-wider uppercase flex items-center justify-between" for="phoneInput">
+<span class="">Behörden-Rufnummer</span>
+<span class="text-secondary font-medium lowercase text-[10px] tracking-normal">Automatisch erkannt</span>
+</label>
+<div class="relative flex items-center">
+<span class="material-symbols-outlined absolute left-3 text-outline text-[18px]">call</span>
+<input class="w-full bg-surface-container-low text-primary font-mono font-semibold text-[15px] pl-9 pr-9 py-2 rounded-lg border border-transparent focus:border-primary focus:bg-surface-container-lowest focus:ring-0 transition-all outline-none" id="phoneInput" type="text" value="0621 / 292-0">
+<button class="absolute right-2.5 p-1 text-outline hover:text-primary active:scale-95 transition-colors" onclick="document.getElementById('phoneInput').focus()" title="Nummer bearbeiten" type="button">
+<span class="material-symbols-outlined text-[17px]">edit</span>
+</button>
+</div>
+</div>
+<!-- Field 2: Gesprächsgrund -->
+<div class="bg-surface-container-lowest border border-surface-container-high rounded-xl p-3.5 shadow-xs flex flex-col gap-1.5">
+<span class="font-label-sm text-[11px] text-on-surface-variant font-bold tracking-wider uppercase">Gesprächsgrund</span>
+<div class="bg-surface-container-low px-3 py-2.5 rounded-lg border border-transparent flex items-start gap-2">
+<span class="material-symbols-outlined text-secondary text-[18px] mt-0.5 shrink-0">chat</span>
+<p class="font-body-md text-primary text-[14px] leading-snug font-medium">
+            Rückfrage zu Steuerbescheid 2025 (Nachzahlung 312,40 €)
+          </p>
+</div>
+</div>
+<!-- Field 3: Übermitteltes Aktenzeichen -->
+<div class="bg-surface-container-lowest border border-surface-container-high rounded-xl p-3.5 shadow-xs flex flex-col gap-1.5">
+<span class="font-label-sm text-[11px] text-on-surface-variant font-bold tracking-wider uppercase">Übermitteltes Aktenzeichen</span>
+<div class="flex items-center justify-between bg-surface-container-low px-3 py-2.5 rounded-lg">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[17px] shrink-0">tag</span>
+<span class="font-mono font-bold text-primary text-[14px] tracking-tight">38/204/91823</span>
+</div>
+<span class="text-[11px] text-outline">Steuer-ID hinterlegt</span>
+</div>
+</div>
+<!-- Callout card: Wie der KI-Assistent vorgeht -->
+<div class="bg-primary/5 border border-primary/10 rounded-xl p-3.5 flex flex-col gap-2.5">
+<div class="flex items-center gap-1.5 text-primary">
+<span class="material-symbols-outlined text-[18px] text-secondary">info</span>
+<h3 class="font-label-lg text-[13px] font-bold text-primary">So funktioniert der Anruf-Assistent:</h3>
+</div>
+<ol class="flex flex-col gap-2 pl-1 font-body-sm text-on-surface-variant text-[12.5px] leading-relaxed">
+<li class="flex items-start gap-2">
+<span class="w-4 h-4 rounded-full bg-primary text-on-primary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
+<span class="">Wählt die Nummer &amp; drückt Menütasten („Drücken Sie die 1 für Veranlagung“)</span>
+</li>
+<li class="flex items-start gap-2">
+<span class="w-4 h-4 rounded-full bg-primary text-on-primary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
+<span class="">Wartet in der Melodie</span>
+</li>
+<li class="flex items-start gap-2">
+<span class="w-4 h-4 rounded-full bg-primary text-on-primary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">3</span>
+<span class="">Sobald ein Sachbearbeiter abnimmt, verbindet Appella das Gespräch direkt mit dir.</span>
+</li>
+</ol>
+</div>
+<!-- Privacy Reassurance -->
+<div class="flex items-center justify-center gap-2 py-1 text-on-surface-variant text-[12px]">
+<span class="material-symbols-outlined text-[16px] text-secondary" style="font-variation-settings: 'FILL' 1;">verified_user</span>
+<span class="font-medium">Keine Audio-Mitschnitte. DSGVO-konform.</span>
+</div>
+<!-- Bottom Action Area -->
+<div class="flex flex-col gap-2 pt-1 pb-safe">
+<button class="w-full bg-primary active:bg-primary-container text-on-primary font-label-lg text-[14px] py-3.5 px-4 rounded-xl flex items-center justify-center gap-2.5 shadow-md active:scale-[0.99] transition-all group" id="startCallBtn" type="button"><span class="material-symbols-outlined text-[20px] text-secondary-fixed transition-transform group-hover:scale-110" style="font-variation-settings: &quot;FILL&quot; 1;">phone_in_talk</span>
+<span class="font-semibold">Anruf starten &amp; Warteschleife übergeben</span></button>
+<button class="w-full bg-transparent hover:bg-surface-container active:bg-surface-container-high text-on-surface font-label-md text-[13px] py-2.5 rounded-xl transition-colors font-medium text-center" onclick="history.back()" type="button">
+          Zurück zum Brief
+        </button>
+</div>
+</main>
+</div>
+<script>
+    (function() {
+      const startCallBtn = document.getElementById('startCallBtn');
+      if (startCallBtn) {
+        startCallBtn.addEventListener('click', () => {
+          startCallBtn.innerHTML = `
+            <span class="material-symbols-outlined animate-spin text-[20px]">progress_activity</span>
+            <span class="font-semibold">Verbindung wird initiiert...</span>
+          `;
+          startCallBtn.classList.add('opacity-90', 'pointer-events-none');
+          setTimeout(() => {
+            startCallBtn.innerHTML = `
+              <span class="material-symbols-outlined text-secondary-fixed text-[20px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+              <span class="font-semibold">Assistent ist in der Warteschleife!</span>
+            `;
+          }, 1400);
+        });
+      }
+    })();
+  </script>
+
+
+</body></html>
