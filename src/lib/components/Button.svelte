@@ -10,4 +10,6 @@
   };
 </script>
 
-<button type="button" {...rest} class="inline-flex min-h-12 items-center justify-center gap-2 rounded-xl px-4 py-3 text-label-lg transition-colors active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 {variants[variant]} {className}">{@render children?.()}</button>
+<button type="button" {...rest} class="inline-flex min-h-12 items-center justify-center rounded-xl px-4 py-2.5 text-label-lg transition-colors active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50 {variants[variant]} {className}">
+  <span class="button-content">{@render children?.()}</span>
+</button>

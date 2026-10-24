@@ -27,6 +27,6 @@
 <div lang={language.current}>
   <AppHeader subtitle={isLetter ? t('result') : isCall ? t('liveCall') : undefined} backHref={isLetter ? '/archive' + (demo ? '?demo=1' : '') : isCall ? '/' + (demo ? '?demo=1' : '') : undefined} />
   {#if demo}<div class="border-b border-secondary-container bg-secondary-container/40 px-4 py-2 text-center text-label-md text-on-secondary-fixed-variant">{t('preview')}</div>{/if}
-  <main id="main" class="page-column" class:with-nav={!isLetter && !isCall} tabindex="-1">{@render children()}</main>
+  <main id="main" class="page-column" class:with-nav={!isLetter && !isCall} class:with-action={page.url.pathname === '/archive'} tabindex="-1">{@render children()}</main>
   {#if !isLetter && !isCall}<BottomNav />{/if}
 </div>

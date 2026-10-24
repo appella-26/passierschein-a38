@@ -4,7 +4,7 @@
   import type { GraphData, GraphNode, NodeKind } from '#lib/types.ts';
   import { request } from '#lib/api.ts';
   import { documentId, linkedDocuments, nodeColors } from '#lib/graph.ts';
-  import { t } from '#lib/i18n.ts';
+  import { language, t } from '#lib/i18n.ts';
   import Card from '#lib/components/Card.svelte';
   import Button from '#lib/components/Button.svelte';
   import Icon from '#lib/components/Icon.svelte';
@@ -20,12 +20,13 @@
   const documents = $derived(data?.nodes.filter(node => node.kind === 'document') ?? []);
   $effect(() => {
     const isDemo = demo;
+    const lang = isDemo ? language.current : 'en';
     void reload;
     const abort = new AbortController();
     loading = true; failed = false; selected = null;
     (async () => {
       try {
-        const result = isDemo ? (await import('#lib/mock/data.ts')).mockGraph() : await request<GraphData>('/api/graph', { signal: abort.signal });
+        const result = isDemo ? (await import('#lib/mock/data.ts')).mockGraph(lang) : await request<GraphData>('/api/graph', { signal: abort.signal });
         if (!abort.signal.aborted) data = result;
       } catch { if (!abort.signal.aborted) failed = true; }
       finally { if (!abort.signal.aborted) loading = false; }
@@ -40,7 +41,7 @@
 </script>
 
 <svelte:head><title>{t('graph')} · {t('brand')}</title></svelte:head>
-<div class="space-y-5">
+<div class="space-y-6">
   <section><h1 class="font-headline text-headline-lg-mobile text-primary md:text-headline-lg">{t('graphTitle')}</h1><p class="mt-2 text-body-md text-on-surface-variant">{t('graphIntro')}</p></section>
   {#if loading}<Card><p role="status" class="text-body-sm text-outline">{t('loading')}</p></Card>{:else if failed}<Card class="space-y-4"><p role="alert" class="text-body-sm text-error">{t('graphLoadError')}</p><Button onclick={() => reload++}>{t('retry')}</Button></Card>{:else if !data?.nodes.length}<Card class="py-10 text-center"><Icon name="graph" size={40} class="mx-auto mb-4 text-secondary" /><h2 class="font-headline text-headline-md text-primary">{t('graphEmpty')}</h2><p class="mx-auto mt-2 max-w-sm text-body-sm text-on-surface-variant">{t('graphEmptyHint')}</p><a href={'/' + (demo ? '?demo=1' : '')} class="mt-5 inline-flex min-h-12 items-center justify-center rounded-xl bg-primary px-5 text-label-lg text-white">{t('capture')}</a></Card>{:else}
     <Card class="space-y-4"><div class="flex flex-wrap gap-x-4 gap-y-2">{#each kinds as kind}<span class="inline-flex items-center gap-1.5 text-[11px] text-on-surface-variant"><span class="size-2.5 rounded-full" style:background={nodeColors[kind]}></span>{t(kind)}</span>{/each}</div><GraphView {data} onselect={selectNode} /><p class="text-body-sm text-on-surface-variant">{t('graphHint')}</p>

@@ -1,0 +1,43 @@
+{
+  "document_type": "Income tax assessment 2025",
+  "sender": { "name": "Finanzamt Mannheim-Stadt", "type": "authority", "phone": "+496212920", "email": null },
+  "letter_date": "2026-10-02",
+  "references": [
+    { "label": "Steuernummer", "value": "37 012 345 67" },
+    { "label": "Aktenzeichen", "value": "38/204/91823" }
+  ],
+  "summary": "The tax office has assessed your income tax for 2025. You still owe €312.40, payable by 5 November 2026. If the figures look wrong, you can file an appeal (Einspruch) within one month of official notification. An appeal doesn't automatically pause the payment deadline.",
+  "urgency": "high",
+  "deadline": "2026-11-05",
+  "deadline_is_estimate": false,
+  "amount_due": "312,40 EUR",
+  "payment": null,
+  "case_title": "Income tax 2025",
+  "action_items": [
+    {
+      "title": "Pay the outstanding €312.40",
+      "type": "pay",
+      "due": "2026-11-05",
+      "details": "Check the bank details in the original notice before paying. Use your tax number (Steuernummer) 37 012 345 67 and the tax year 2025 as the payment reference.",
+      "phone": null, "phone_raw": null, "call_purpose_de": null, "done": false
+    },
+    {
+      "title": "Check the tax calculation",
+      "type": "other",
+      "due": "2026-11-06",
+      "details": "Compare the figures with your tax return, including your work-related expenses (Werbungskosten). The appeal date below is only an estimate: it assumes official notification four days after the date on the letter. Check the actual notification date and the appeal instructions in the original.",
+      "phone": null, "phone_raw": null, "call_purpose_de": null, "done": false
+    },
+    {
+      "title": "Ask the tax office about anything unclear",
+      "type": "call",
+      "due": "2026-11-05",
+      "details": "Keep the notice and your tax number handy. Ask them to explain the outstanding balance or any work-related expenses that don't add up.",
+      "phone": "+496212920", "phone_raw": "0621 / 292-0",
+      "call_purpose_de": "Rückfrage zum Einkommensteuerbescheid 2025 und zur Nachzahlung von 312,40 Euro.",
+      "done": false
+    }
+  ],
+  "keywords": ["income tax", "tax assessment", "back payment", "appeal", "Einkommensteuer", "Steuerbescheid", "Nachzahlung", "Einspruch"],
+  "entities": [{ "type": "topic", "name": "Income tax 2025" }, { "type": "topic", "name": "Work-related expenses" }, { "type": "person", "name": "Caseworker Müller" }]
+}

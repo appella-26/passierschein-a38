@@ -4,14 +4,16 @@
   import type { ActionItem, DocumentDetail } from '#lib/types.ts';
   import { ApiError, getDocument } from '#lib/api.ts';
   import { deadlineLabel, formatDate } from '#lib/format.ts';
-  import { t } from '#lib/i18n.ts';
-  import { checklist, initChecklist, setCompleted } from '#lib/checklist.svelte.ts';
+  import { language, t } from '#lib/i18n.ts';
+  import { checklist, initChecklist } from '#lib/checklist.svelte.ts';
   import Card from '#lib/components/Card.svelte';
   import Button from '#lib/components/Button.svelte';
   import Icon from '#lib/components/Icon.svelte';
   import Pill from '#lib/components/Pill.svelte';
   import CallConfirm from '#lib/components/CallConfirm.svelte';
   import BottomSheet from '#lib/components/BottomSheet.svelte';
+  import ActionChecklist from '#lib/components/ActionChecklist.svelte';
+  import ReferenceChip from '#lib/components/ReferenceChip.svelte';
 
   let doc = $state<DocumentDetail | null>(null);
   let loading = $state(true);
@@ -31,6 +33,7 @@
   $effect(() => {
     const id = page.params.id;
     const isDemo = demo;
+    const lang = isDemo ? language.current : 'en';
     void reload;
     if (!id) return;
     const abort = new AbortController();
@@ -39,7 +42,7 @@
     (async () => {
       try {
         if (isDemo) {
-          const sample = (await import('#lib/mock/data.ts')).mockDocuments.find(item => item.id === id);
+          const sample = (await import('#lib/mock/data.ts')).getMockDocuments(lang).find(item => item.id === id);
           if (!sample) throw new ApiError(404);
           if (!abort.signal.aborted) doc = sample;
         } else {
@@ -68,32 +71,56 @@
 {#if loading}<Card><p role="status" class="text-body-md text-outline">{t('loading')}</p></Card>
 {:else if errorKey}<Card class="space-y-4"><h1 class="font-headline text-headline-lg-mobile text-primary">{t(errorKey)}</h1><Button onclick={() => reload++}>{t('retry')}</Button></Card>
 {:else if doc}
-  <div class="space-y-4 md:space-y-5">
+  <div class="space-y-6">
     <Card class="space-y-3">
       <div class="flex items-start justify-between gap-3">
         <div class="flex min-w-0 flex-1 items-start gap-2.5">
           <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-surface-container text-primary"><Icon name="bank" size={24} /></span>
-          <div><p class="eyebrow text-outline">{t('sender')}</p><p class="text-label-lg text-primary">{doc.analysis.sender.name}</p></div>
+          <div class="min-w-0"><p class="eyebrow text-outline">{t('sender')}</p><p class="text-label-lg text-primary">{doc.analysis.sender.name}</p></div>
         </div>
-        <div class="max-w-[42%] shrink-0"><Pill urgency={doc.analysis.urgency} /></div>
+        <div class="max-w-[42%] shrink-0"><Pill urgency={doc.analysis.urgency} label={doc.analysis.urgency === 'high' ? t('urgent') : undefined} /></div>
       </div>
       <h1 class="font-headline text-headline-lg-mobile text-primary md:text-headline-lg">{doc.analysis.document_type}</h1>
-      {#if doc.analysis.letter_date}<p class="flex items-center gap-2 text-body-sm text-on-surface-variant"><Icon name="calendar" size={16} />{t('dated', { date: formatDate(doc.analysis.letter_date) })}</p>{/if}
+      {#if doc.analysis.letter_date}<p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-body-sm text-on-surface-variant"><Icon name="calendar" size={16} class="shrink-0" /><span>{t('letterDate')}</span><time datetime={doc.analysis.letter_date} class="whitespace-nowrap">{formatDate(doc.analysis.letter_date, true)}</time></p>{/if}
     </Card>
-    <div class="grid items-start gap-4 md:grid-cols-2">
-      {#if doc.analysis.deadline || doc.analysis.amount_due}
-        <Card class="relative overflow-hidden !p-5"><div class="absolute inset-y-0 left-0 w-1.5 {doc.analysis.urgency === 'high' ? 'bg-error' : 'bg-on-tertiary-container'}"></div><h2 class="eyebrow flex items-center gap-1.5 text-error"><Icon name="clock" size={16} />{t(doc.analysis.deadline ? 'deadline' : 'amount')}</h2>{#if doc.analysis.amount_due}<p class="mt-3 font-headline text-headline-xl-mobile font-semibold text-error">{doc.analysis.amount_due}</p><p class="text-body-sm text-on-surface-variant">{t('amount')}</p>{/if}{#if doc.analysis.deadline}<p class="mt-3 flex items-start gap-2 text-label-lg text-primary"><Icon name="calendar" size={19} class="shrink-0 text-error" /><span>{deadlineLabel(doc.analysis.deadline, today)}<span class="mt-1 block text-body-sm text-on-surface-variant">{formatDate(doc.analysis.deadline)}</span></span></p>{#if doc.analysis.deadline_is_estimate}<p class="mt-3 text-body-sm text-outline">{t('estimated')}</p>{/if}{/if}</Card>
-      {/if}
-      <div class="space-y-3 rounded-xl bg-surface-container p-4"><h2 class="flex items-center gap-2 text-label-lg text-secondary"><Icon name="bulb" size={22} />{t('summary')}</h2><p class="text-body-md text-on-surface">{doc.analysis.summary}</p><p class="flex items-start gap-1.5 text-[11px] leading-5 text-on-surface-variant"><Icon name="info" size={15} class="mt-0.5 shrink-0 text-secondary" />{t('summaryDisclaimer')}</p></div>
-    </div>
-    {#if doc.analysis.references.length}<section class="space-y-2"><h2 class="eyebrow px-1 text-outline">{t('references')}</h2><div class="flex flex-wrap gap-2">{#each doc.analysis.references as reference, index (index)}<button type="button" onclick={() => copy(reference.value)} aria-label={t('copyReference', { label: reference.label })} class="flex min-h-12 max-w-full items-center gap-2 rounded-xl border border-surface-container bg-white px-3 py-2.5 text-left shadow-paper hover:bg-surface-container-low"><Icon name="tag" size={17} class="shrink-0 text-outline" /><span class="select-all break-all text-body-sm text-on-surface">{reference.label}: <strong class="font-semibold text-primary">{reference.value}</strong></span><Icon name="copy" size={16} class="shrink-0 text-outline" /></button>{/each}</div></section>{/if}
-    <Card class="space-y-4"><div class="flex items-center justify-between gap-2"><h2 class="flex items-center gap-2 font-headline text-headline-md text-primary"><Icon name="list" size={22} />{t('todos')}</h2><span class="rounded-full bg-secondary-container px-2 py-1 text-[11px] text-on-secondary-fixed-variant">{t('completed', { done: completed.length, total: doc.analysis.action_items.length })}</span></div>
-      <div class="space-y-3">{#each doc.analysis.action_items as action, index (index)}<div class="space-y-3 rounded-xl bg-surface-container-low p-3"><div class="flex items-start gap-2"><label class="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg"><input type="checkbox" class="size-6 rounded-md accent-secondary" checked={completed.includes(index)} onchange={event => setCompleted(doc!.id, index, event.currentTarget.checked)} aria-label={t('completeAction', { title: action.title })} /></label><div class="min-w-0 flex-1 pt-2"><h3 class="text-label-lg text-primary" class:line-through={completed.includes(index)} class:opacity-60={completed.includes(index)}>{action.title}</h3><p class="mt-1 whitespace-pre-line text-body-sm text-on-surface-variant">{action.details}</p>{#if action.due}<p class="mt-2 text-[11px] text-outline">{t('dueDate', { date: formatDate(action.due) })}</p>{/if}</div></div>
-        {#if action.type === 'call'}<div class="space-y-3 rounded-lg border border-surface-container bg-white p-3"><div class="flex items-start justify-between gap-2"><h4 class="flex items-center gap-1.5 text-label-md text-primary"><Icon name="headset" size={18} class="shrink-0 text-secondary" />{t('waitingPilot')}</h4><span class="rounded-full bg-surface-container px-2 py-1 text-[10px] text-on-surface-variant">{t('automaticCall')}</span></div><p class="text-body-sm text-on-surface-variant">{t('waitingHint')}</p>{#if action.phone}<p class="font-mono text-body-sm text-primary">{action.phone_raw ?? action.phone}</p><Button class="w-full" onclick={() => prepareCall(action)}><Icon name="headset" size={20} />{t('waitForMe')}</Button>{:else}<p class="text-body-sm text-outline">{t('missingPhone')}</p>{/if}</div>{/if}
-      </div>{:else}<p class="text-body-sm text-on-surface-variant">{t('noActions')}</p>{/each}</div><p class="text-[11px] leading-5 text-outline">{t('localChecklist')}</p>
-    </Card>
+    {#if doc.analysis.deadline || doc.analysis.amount_due}
+      <Card class="relative overflow-hidden !pl-5">
+        <div class="absolute inset-y-0 left-0 w-1 {doc.analysis.urgency === 'high' ? 'bg-error' : 'bg-on-tertiary-container'}"></div>
+        <div class="space-y-4">
+          <h2 class="eyebrow flex items-center gap-1.5 {doc.analysis.urgency === 'high' ? 'text-error' : 'text-on-tertiary-fixed-variant'}"><Icon name="clock" size={16} />{t(doc.analysis.deadline ? 'deadline' : 'amount')}</h2>
+          <div class="grid items-center gap-4 {doc.analysis.amount_due && doc.analysis.deadline ? 'sm:grid-cols-2' : ''}">
+            {#if doc.analysis.amount_due}
+              <div>
+                <p class="whitespace-nowrap font-headline text-headline-xl-mobile font-semibold {doc.analysis.urgency === 'high' ? 'text-error' : 'text-on-tertiary-fixed-variant'}">{doc.analysis.amount_due}</p>
+                <p class="mt-1 text-body-sm text-on-surface-variant">{t('amount')}</p>
+              </div>
+            {/if}
+            {#if doc.analysis.deadline}
+              <div class="flex items-start gap-2 text-primary">
+                <Icon name="calendar" size={19} class="mt-0.5 shrink-0" />
+                <div><p class="text-label-lg">{deadlineLabel(doc.analysis.deadline, today)}</p><time datetime={doc.analysis.deadline} class="mt-1 block whitespace-nowrap text-body-sm text-on-surface-variant">{formatDate(doc.analysis.deadline)}</time></div>
+              </div>
+            {/if}
+          </div>
+          {#if doc.analysis.deadline_is_estimate}<p class="prose-copy border-t border-surface-container pt-3 text-body-sm text-outline">{t('estimated')}</p>{/if}
+        </div>
+      </Card>
+    {/if}
+    <section class="space-y-3 rounded-xl bg-surface-container p-4">
+      <h2 class="flex items-center gap-2 text-label-lg text-secondary"><Icon name="bulb" size={22} class="shrink-0" />{t('summary')}</h2>
+      <p class="prose-copy text-body-md text-on-surface">{doc.analysis.summary}</p>
+      <p class="flex items-start gap-2 text-[12px] leading-5 text-on-surface-variant"><Icon name="info" size={15} class="mt-0.5 shrink-0 text-secondary" /><span>{t('summaryDisclaimer')}</span></p>
+    </section>
+    {#if doc.analysis.references.length}
+      <section class="space-y-3"><h2 class="eyebrow text-outline">{t('references')}</h2><div class="flex flex-wrap gap-2">{#each doc.analysis.references as reference, index (index)}<ReferenceChip label={reference.label} value={reference.value} oncopy={copy} />{/each}</div></section>
+    {/if}
+    <ActionChecklist {doc} {completed} oncall={prepareCall} />
     <Card class="space-y-3"><h2 class="eyebrow text-outline">{t('related')}</h2>{#each doc.related as related (related.id)}<a href={`/letters/${encodeURIComponent(related.id)}${demo ? '?demo=1' : ''}`} class="flex min-h-12 items-center justify-between gap-3 rounded-xl bg-surface-container-low p-3 text-primary"><Icon name="document" size={22} class="shrink-0" /><div class="min-w-0 flex-1"><p class="text-label-md">{related.document_type}</p><p class="mt-1 text-body-sm text-on-surface-variant">{related.shared}</p></div><Icon name="arrow" size={20} class="shrink-0" /></a>{:else}<p class="text-body-sm text-outline">{t('noRelated')}</p>{/each}</Card>
-    <div class="grid gap-3 sm:grid-cols-2"><Button variant="secondary" onclick={() => { scanPage = 1; scanOpen = true; }}><Icon name="scan" />{t('original')}</Button><a href={'/archive' + (demo ? '?demo=1' : '')} class="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-surface-container px-4 text-label-lg text-on-surface-variant"><Icon name="folder" />{t('backToArchive')}</a></div><p class="text-center text-[11px] leading-5 text-outline">{t('alreadyArchived')}</p><p class="text-center text-[11px] leading-5 text-outline">{t('analysisLanguage')}</p>
+    <div class="space-y-3">
+      <div class="grid gap-3 sm:grid-cols-2"><Button variant="secondary" onclick={() => { scanPage = 1; scanOpen = true; }}><Icon name="scan" />{t('original')}</Button><a href={'/archive' + (demo ? '?demo=1' : '')} class="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-surface-container px-4 text-label-lg text-on-surface-variant"><Icon name="folder" />{t('backToArchive')}</a></div>
+      <p class="text-center text-[12px] leading-5 text-outline">{t('alreadyArchived')}</p>
+      <p class="mx-auto max-w-prose text-center text-[12px] leading-5 text-outline">{t('analysisLanguage')}</p>
+    </div>
   </div>
   {#if callAction}<CallConfirm bind:open={confirmOpen} {doc} action={callAction} {demo} />{/if}
   <BottomSheet bind:open={scanOpen} title={t('original')}>

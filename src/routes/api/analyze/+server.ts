@@ -1,7 +1,7 @@
 // POST /api/analyze  { images: string[] (base64, no data: prefix), lang: 'de' | 'en' }
-// -> { id, analysis, related }   (photos + analysis are stored locally)
+// -> { id, case_id, case_created, analysis, related }   (photos + analysis are stored locally)
 import { json, error } from '@sveltejs/kit';
-import { analyzeLetter } from '#lib/server/analyze.ts';
+import { analyzeLetter, LetterAnalysisError } from '#lib/server/analyze.ts';
 import { saveDocument, relatedDocuments } from '#lib/server/db.ts';
 
 export async function POST({ request }) {
@@ -13,10 +13,17 @@ export async function POST({ request }) {
 	try {
 		analysis = await analyzeLetter(images, l);
 	} catch (e) {
-		console.error(e);
-		error(502, 'Analysis failed — is Ollama running?');
+		const details = e instanceof LetterAnalysisError ? e.message : 'Unexpected analysis error';
+		console.error(`Letter analysis failed: ${details}`);
+		error(e instanceof LetterAnalysisError ? e.status : 502, details);
 	}
 
-	const id = await saveDocument(images, analysis, l);
-	return json({ id, analysis, related: relatedDocuments(id) });
+	const saved = await saveDocument(images, analysis, l);
+	return json({
+		id: saved.id,
+		case_id: saved.caseId,
+		case_created: saved.caseCreated,
+		analysis,
+		related: relatedDocuments(saved.id)
+	});
 }

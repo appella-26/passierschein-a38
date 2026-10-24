@@ -50,7 +50,7 @@
 </script>
 
 <svelte:head><title>{t('liveCall')} · {t('brand')}</title></svelte:head>
-<div class="space-y-5">
+<div class="space-y-6">
   {#if demo}<Card class="!p-3"><label for="demo-state" class="mb-2 block text-label-md text-primary">{t('demoCallState')}</label><select id="demo-state" class="paper-input" value={callStatus} onchange={event => receiveEvent({ state: event.currentTarget.value as typeof callStatus, at: new Date().toISOString() })}>{#each callStates as value}<option value={value}>{t(value)}</option>{/each}</select></Card>{/if}
   {#if callSession.connection === 'unavailable'}
     <Card class="space-y-4 text-center"><Icon name="warning" size={36} class="mx-auto text-error" /><h1 class="font-headline text-headline-lg-mobile text-primary">{t('notFound')}</h1><p class="text-body-md text-on-surface-variant">{t('callUnavailable')}</p><Button variant="quiet" onclick={() => watchCall(page.params.id ?? '', demo)}>{t('retry')}</Button></Card>
@@ -62,7 +62,7 @@
         <p class="eyebrow mb-3 {answered ? 'text-secondary' : callStatus === 'failed' ? 'text-error' : 'text-outline'}">{t(callStatus)}</p>
         <h1 class="max-w-md font-headline text-headline-xl-mobile text-primary sm:text-headline-xl">{t(answered && callStatus !== 'connected' ? 'humanTitle' : callStatus)}</h1>
         {#if context}<p class="mt-3 text-label-lg text-primary">{context.senderName}</p>{/if}
-        <p class="mt-4 max-w-md text-body-md text-on-surface-variant">{t(answered ? callStatus === 'connected' ? 'connectedHint' : 'humanHint' : callStatus === 'voicemail' ? 'voicemailHint' : callStatus === 'failed' ? 'failedHint' : 'endedHint')}</p>
+        <p class="mt-4 max-w-md text-body-md leading-relaxed text-on-surface-variant">{t(answered ? callStatus === 'connected' ? 'connectedHint' : 'humanHint' : callStatus === 'voicemail' ? 'voicemailHint' : callStatus === 'failed' ? 'failedHint' : 'endedHint')}</p>
         <div class="mt-7 flex w-full max-w-sm flex-col gap-3">{#if !terminal}<Button variant={answered ? 'secondary' : 'danger'} disabled={cancelling} onclick={cancel}><Icon name="close" size={19} />{t(cancelling ? 'cancellingCall' : 'cancelCall')}</Button>{/if}{#if context}<a href={`/letters/${encodeURIComponent(context.letterId)}${demo ? '?demo=1' : ''}`} class="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-white px-4 text-label-lg text-primary"><Icon name="document" />{t('backToLetter')}</a>{/if}<a href={'/' + (demo ? '?demo=1' : '')} class="flex min-h-12 items-center justify-center rounded-xl text-label-lg text-primary">{t('overview')}</a></div>
       </section>
     {:else}

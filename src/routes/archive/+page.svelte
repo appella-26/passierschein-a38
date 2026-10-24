@@ -45,13 +45,14 @@
   $effect(() => {
     const q = query.trim();
     const isDemo = demo;
+    const lang = isDemo ? language.current : 'en';
     void reload;
     const abort = new AbortController();
     loading = true; failed = false;
     const timer = setTimeout(async () => {
       try {
         const mock = isDemo ? await import('#lib/mock/data.ts') : null;
-        const rows = mock ? mock.mockRows(q) : await request<DocumentRow[]>(`/api/documents${q ? '?q=' + encodeURIComponent(q) : ''}`, { signal: abort.signal });
+        const rows = mock ? mock.mockRows(q, lang) : await request<DocumentRow[]>(`/api/documents${q ? '?q=' + encodeURIComponent(q) : ''}`, { signal: abort.signal });
         if (abort.signal.aborted) return;
         documents = rows;
         loading = false;
@@ -61,7 +62,7 @@
           while (index < rows.length && !abort.signal.aborted) {
             const row = rows[index++];
             try {
-              const detail = mock ? mock.mockDocuments.find(doc => doc.id === row.id) : await getDocument(row.id, abort.signal);
+              const detail = mock ? mock.getMockDocuments(lang).find(doc => doc.id === row.id) : await getDocument(row.id, abort.signal);
               if (detail && !abort.signal.aborted) details[row.id] = detail;
             } catch { /* Basic archive cards remain readable if an individual detail request fails. */ }
           }
@@ -73,15 +74,33 @@
 </script>
 
 <svelte:head><title>{t('archive')} · {t('brand')}</title></svelte:head>
-<div class="space-y-5">
+<div class="space-y-6">
   <h1 class="font-headline text-headline-lg-mobile text-primary md:text-headline-lg">{t('archive')}</h1>
   <section class="space-y-3"><label class="sr-only" for="archive-search">{t('searchLabel')}</label><div class="relative"><Icon name="search" size={20} class="pointer-events-none absolute left-3.5 top-3.5 text-outline" /><input id="archive-search" type="search" class="paper-input border-surface-container !pl-11 !pr-14 shadow-paper" bind:value={query} placeholder={t('archiveSearch')} />{#if query}<button type="button" class="touch-icon absolute right-1 top-0.5 text-outline" onclick={() => query = ''} aria-label={t('clearSearch')}><Icon name="close" size={18} /></button>{/if}</div>
     <div class="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 py-1" role="group" aria-label={t('resetFilters')}>{#each filters as filter}<button type="button" class="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full px-3.5 text-label-md shadow-paper {activeFilter === filter ? 'bg-primary text-white' : 'bg-white text-on-surface-variant hover:bg-surface-container'}" onclick={() => activeFilter = filter} aria-pressed={activeFilter === filter}>{#if filter === 'openDeadlines'}<span class="size-1.5 rounded-full bg-error"></span>{/if}{t(filter as TranslationKey)}<span class="rounded-full px-1.5 py-0.5 text-[10px] {activeFilter === filter ? 'bg-white/10' : 'bg-surface-container'}">{documents.filter(doc => matches(doc, filter)).length}</span></button>{/each}</div>
   </section>
-  {#if !failed && !loading}<Card class="flex flex-wrap items-center justify-between gap-3 !p-3.5"><div class="flex items-center gap-3"><span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-tertiary-fixed text-on-tertiary-fixed-variant"><Icon name="calendar" size={22} /></span><div><p class="text-label-lg text-primary">{t('openDeadlineCount', { count: open.length })}</p>{#if nextDeadline}<p class="mt-1 text-body-sm text-on-surface-variant">{t('nextDue', { date: formatDate(nextDeadline) })}</p>{/if}</div></div>{#if amounts.length}<div class="text-right"><p class="eyebrow text-outline">{t('totalAmount')}</p><p class="font-headline text-headline-md text-primary">{total}</p></div>{/if}</Card>{/if}
+  {#if !failed && !loading}
+    <Card class="grid items-center gap-3 sm:grid-cols-[1fr_auto]">
+      <div class="flex min-w-0 items-center gap-3">
+        <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-tertiary-fixed text-on-tertiary-fixed-variant"><Icon name="calendar" size={22} /></span>
+        <div class="min-w-0">
+          <p class="text-label-lg text-primary">{t('openDeadlineCount', { count: open.length })}</p>
+          {#if nextDeadline}<p class="mt-1 text-body-sm text-on-surface-variant">{t('nextDueLabel')}: <time datetime={nextDeadline} class="whitespace-nowrap">{formatDate(nextDeadline, true)}</time></p>{/if}
+        </div>
+      </div>
+      {#if amounts.length}
+        <div class="border-t border-surface-container pt-3 sm:border-0 sm:pt-0 sm:text-right">
+          <p class="eyebrow text-outline">{t('totalAmount')}</p>
+          <p class="mt-1 whitespace-nowrap font-headline text-headline-md text-primary">{total}</p>
+        </div>
+      {/if}
+    </Card>
+  {/if}
   <section aria-busy={loading}>
-    {#if loading}<Card><p role="status" class="text-body-sm text-outline">{t('loading')}</p></Card>{:else if failed}<Card class="space-y-3"><p role="alert" class="text-body-sm text-error">{t('error')}</p><Button onclick={() => reload++}>{t('retry')}</Button></Card>{:else if !visible.length}<Card class="py-10 text-center"><Icon name="search" size={32} class="mx-auto mb-4 text-outline" /><h2 class="font-headline text-headline-md text-primary">{t('noResults')}</h2><p class="mx-auto mt-2 max-w-sm text-body-sm text-on-surface-variant">{t('noResultsHint')}</p><Button class="mt-4" onclick={() => { query = ''; activeFilter = 'all'; }}>{t('resetFilters')}</Button></Card>{:else}<div class="grid items-start gap-3 md:grid-cols-2">{#each visible as doc (doc.id)}<LetterCard {doc} detail={details[doc.id]} {demo} completed={done(doc)} />{/each}</div>{/if}
+    {#if loading}<Card><p role="status" class="text-body-sm text-outline">{t('loading')}</p></Card>{:else if failed}<Card class="space-y-3"><p role="alert" class="text-body-sm text-error">{t('error')}</p><Button onclick={() => reload++}>{t('retry')}</Button></Card>{:else if !visible.length}<Card class="py-10 text-center"><Icon name="search" size={32} class="mx-auto mb-4 text-outline" /><h2 class="font-headline text-headline-md text-primary">{t('noResults')}</h2><p class="mx-auto mt-2 max-w-sm text-body-sm text-on-surface-variant">{t('noResultsHint')}</p><Button class="mt-4" onclick={() => { query = ''; activeFilter = 'all'; }}>{t('resetFilters')}</Button></Card>{:else}<div class="grid items-start gap-4 lg:grid-cols-2">{#each visible as doc (doc.id)}<LetterCard {doc} detail={details[doc.id]} {demo} completed={done(doc)} />{/each}</div>{/if}
   </section>
-  <div class="sticky bottom-[104px] flex justify-center pt-2"><a href={'/' + (demo ? '?demo=1' : '')} class="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-label-lg text-white shadow-paper hover:bg-primary-container"><Icon name="camera" size={22} />{t('newLetter')}</a></div>
+  <div class="archive-action">
+    <div class="shell-container"><a href={'/' + (demo ? '?demo=1' : '')} class="inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-primary px-5 py-2.5 text-label-lg text-white shadow-paper hover:bg-primary-container"><Icon name="camera" size={22} class="shrink-0" /><span>{t('newLetter')}</span></a></div>
+  </div>
   {#if Object.keys(checklist.completed).length}<p class="text-center text-[11px] text-outline">{t('localChecklist')}</p>{/if}
 </div>

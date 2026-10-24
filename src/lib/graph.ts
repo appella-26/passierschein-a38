@@ -1,7 +1,7 @@
-import type { GraphData, GraphNode, NodeKind } from '#lib/types.ts';
+import type { GraphData, GraphNode, GraphNodeKind } from '#lib/types.ts';
 
-export const nodeColors: Record<NodeKind, string> = {
-  document: 'var(--color-primary)', organization: 'var(--color-secondary)', reference: 'var(--color-on-tertiary-container)', person: 'var(--color-surface-tint)', topic: 'var(--color-on-tertiary-fixed-variant)'
+export const nodeColors: Record<GraphNodeKind, string> = {
+  document: 'var(--color-primary)', organization: 'var(--color-secondary)', reference: 'var(--color-on-tertiary-container)', person: 'var(--color-surface-tint)', topic: 'var(--color-on-tertiary-fixed-variant)', case: 'var(--color-primary)'
 };
 
 export function linkedDocuments(data: GraphData, node: GraphNode): GraphNode[] {

@@ -1,23 +1,45 @@
 # Letter Agent: Hacktoberfest starter
 
-Photo of a letter → local Gemma 4 explains it (DE/EN) → to-dos + deadline → letters are stored in a
+Photo of a letter → hosted Gemma 4 explains it (DE/EN) → to-dos + deadline → letters are stored in a
 local knowledge graph you can search → "wait in the phone queue for me" via an ElevenLabs agent that
 transfers the call to your phone when a human answers.
 
-**Privacy:** photos, analyses, graph and embeddings stay on the laptop (Ollama + SQLite).
+**Privacy:** with the default Gemini provider, letter images and prompts are sent to Google for analysis;
+the original photos, analyses, graph and search index are then stored locally. Use redacted/sample letters
+for the demo. The assistant also sends the conversation and retrieved letter details to Google.
+Set `GEMMA_PROVIDER=ollama` to run analysis, assistant chat and optional embeddings locally instead.
 Only number, reference and call purpose go to ElevenLabs/Twilio.
 
 ## Setup (≈ 15 min)
 
 ```bash
-pnpm install                                       # Node >= 22.17, pnpm 12
-cp .env.example .env                                  # fill in keys
-
-ollama pull gemma4:26b       # analysis (try gemma4:31b if OCR is weak)
-ollama pull embeddinggemma   # semantic search
+pnpm install                                      # Node >= 22.17, pnpm 12
+cp .env.example .env                            # add GEMINI_API_KEY from Google AI Studio
 pnpm dev
 cloudflared tunnel --url http://localhost:5173        # URL → ElevenLabs server tool webhook
 ```
+
+The default configuration needs no model download:
+
+```dotenv
+GEMMA_PROVIDER=gemini
+GEMINI_API_KEY=your_key_here
+GEMINI_MODEL=models/gemma-4-26b-a4b-it
+```
+
+For a fully local setup, change `GEMMA_PROVIDER=ollama` and run:
+
+```bash
+ollama pull gemma4:26b       # analysis (try gemma4:31b if OCR is weak)
+ollama pull embeddinggemma   # optional semantic search
+```
+
+`GEMMA_MODEL` is the Ollama model name; `GEMINI_MODEL` is the hosted model name (the app also accepts
+the short name without `models/`). With Gemini, archive search uses SQLite full-text search and skips the
+optional Ollama embedding request.
+
+Storage uses Node's built-in `node:sqlite`. The complete current schema is created directly on a fresh
+database; there is no legacy migration or backfill. This backend expects a fresh database.
 
 Then configure the agent from `agent/elevenlabs-agent.md`, and create the board with
 `REPO=owner/repo PROJECT="..." A=.. B=.. C=.. D=.. ./scripts/create-issues.sh`.
@@ -29,17 +51,50 @@ Then configure the agent from `agent/elevenlabs-agent.md`, and create the board 
 
 | Route | What |
 |---|---|
-| `POST /api/analyze` `{images: base64[], lang}` | Gemma analysis, stores photos + graph → `{id, analysis, related}` |
+| `POST /api/analyze` `{images: base64[], lang}` | Gemma analysis, stores photos + graph, assigns a case → `{id, case_id, case_created, analysis, related}` |
 | `GET /api/documents[?q=]` | Archive list, or hybrid search (FTS5 + embeddings, DE/EN) |
-| `GET /api/documents/:id` | Analysis + related letters (shared sender / Aktenzeichen / topic) |
+| `GET /api/documents/:id` | Analysis + its case + related letters (shared sender / Aktenzeichen / topic) |
 | `GET /api/documents/:id/pages/:n` | Original photo |
-| `GET /api/graph` | `{nodes, links}` for force-graph |
+| `PATCH /api/documents/:id/todos/:index` `{done}` | Set server-side to-do completion (logged, undoable) |
+| `GET /api/cases` | Cases, open first and nearest deadline first |
+| `POST /api/cases` `{title, letter_ids?}` | Create a case, optionally moving letters into it |
+| `GET /api/cases/:id` | Case + chronological letters, page URLs, to-dos and history |
+| `PATCH /api/cases/:id` `{title?, status?, notes?}` | Rename, close/reopen, or change notes |
+| `POST /api/cases/:id/letters` `{letter_id}` | Move a letter into a case |
+| `POST /api/case-events/:id/undo` | Undo a logged change |
+| `POST /api/chat` `{messages, case_id?, lang?}` | Assistant, streaming NDJSON events |
+| `GET /api/graph` | `{nodes, links}` for force-graph, including case nodes |
 | `POST /api/calls` `{toNumber, senderName, purpose, reference}` | Start queue-waiting call |
 | `GET /api/calls/:id/events` | SSE status timeline |
 | `POST /api/calls/:id/cancel` | Hang up |
 | `POST /api/agent/status` | Webhook for the agent's `report_status` tool |
 
-Client helper: `src/lib/resize.ts` downsizes photos in the browser before upload.
+Client helpers: `src/lib/resize.ts` downsizes photos before upload; `src/lib/assistant-client.ts`
+streams chat and parses `[[letter:ID]]` / `[[case:ID]]` references.
+
+## Cases and assistant
+
+A new letter joins the case of the newest letter sharing a reference number; otherwise it starts a
+new case named by Gemma's `case_title`. Changes to case names, status, notes, letter assignment and
+server-side to-dos are logged with inverse operations for undo.
+
+The assistant uses hosted Gemma through Gemini by default, with up to six tool rounds per answer.
+No Ollama installation or model download is required. It supports:
+
+- Read: `search_letters`, `list_cases`, `get_case`, `get_letter`, `list_open_deadlines`, `graph_neighbors`, `draft_reply`.
+- Edit: `create_case`, `rename_case`, `set_case_status`, `move_letter`, `set_todo_done`, `add_case_note`.
+- UI events: `open_case`, `open_letter`, `prepare_call`. The last only prepares a call; it never dials.
+
+Stream events: `text`, `tool` (start/done), `refs`, `change`, `ui`, `done`, `error`.
+The backend/client helpers are available, but assistant and case pages are not added by this backend merge.
+The existing UI checklist stays browser-local and is not synchronized with server-side to-dos.
+
+```bash
+curl -N localhost:5173/api/chat -H 'content-type: application/json' \
+  -d '{"messages":[{"role":"user","content":"Was ist offen?"}]}'
+```
+
+A successful stream ends with `{"type":"done"}`; provider failures emit an `error` event instead.
 
 ## Knowledge graph
 
@@ -49,6 +104,7 @@ Bipartite and built from the Gemma output in the same call, so there's no extra 
 document ──sender──▶ organization   (Finanzamt Mannheim-Stadt)
 document ──reference▶ reference      (Steuernummer 37 012 345 67)
 document ──mentions─▶ person | topic (Sachbearbeiterin Müller, Einkommensteuer 2025)
+document ──case────▶ case            (Einkommensteuer 2025)
 ```
 
 Related letters = shared nodes, weighted reference 3 · organization 2 · person/topic 1.
@@ -65,21 +121,24 @@ Use redacted/sample letters only; `data/` is gitignored.
 The UI uses Svelte 5 runes and Tailwind 4. SvelteKit 3 configuration is in `vite.config.ts`;
 design tokens are in `src/app.css`. The original Stitch references are in `design:stitch/`.
 
-- `/`: photograph or upload one or more JPEG, PNG or WebP pages, then analyze locally.
+- `/`: photograph or upload one or more JPEG, PNG or WebP pages, then analyze with the configured provider.
 - `/letters/:id`: summary, deadlines, copyable references, local checklist, original scans and call confirmation.
 - `/calls/:id`: live SSE timeline, queue timer, human-answer alert and cancellation.
 - `/archive`: bilingual search and filters. Completed-checklist marks are browser-local, not server records.
 - `/graph`: interactive document connections, plus keyboard-accessible document links.
 
-DE/EN changes the interface and the language of **new** analyses. Stored letter text is not automatically
-translated. PDFs and HEIC must first be exported as images. Web fonts are fetched from Google Fonts;
-letter images and analysis data are not sent there. Sound/vibration support varies by browser, and the
-page must remain open for alerts. Returning from analysis stops the browser's wait, not necessarily Ollama's work.
+English is the default; an explicitly saved DE/EN preference takes priority. The toggle changes the
+interface and the language of **new** analyses. Stored letter text is not automatically
+translated. PDFs and HEIC must first be exported as images. Web fonts are fetched from Google Fonts. With
+the Gemini provider, letter images and analysis data are sent to Google for the requested analysis; with
+Ollama they remain local. Sound/vibration support varies by browser, and the page must remain open for
+alerts. Returning from analysis stops the browser's wait, not necessarily the provider request.
 
 ### Preview without Ollama or telephony
 
 With `pnpm dev`, open `http://localhost:5173/?demo=1`. The explicit demo banner and sample Finanzamt letter
-use `src/lib/mock/analysis.json`; archive and graph previews use the same sample data. The demo call has
+use `src/lib/mock/analysis.json` and its English companion `analysis.en.json`; archive and graph previews
+follow the selected language while keeping printed references and German call purposes intact. The demo call has
 a state selector to preview every call view. Demo mode never starts a real call or silently replaces a failed API response.
 It is disabled in production builds.
 
@@ -90,8 +149,12 @@ pnpm check
 pnpm build
 pnpm exec playwright install chromium --only-shell  # once, for browser tests
 pnpm test
+node scripts/check-backend.mjs                     # isolated fresh DB + mocked providers, no network
 ```
 
-Browser tests mock the APIs, so they don't need Ollama and cannot dial a real number. They cover upload,
+Browser tests mock the APIs, so they don't need Gemini or Ollama and cannot dial a real number. They cover upload,
 language persistence, reference copying, checklists, confirmation, call states, search and graph navigation,
 and capture screenshots at 390px and laptop widths in the gitignored `test-results/` directory.
+
+For just the next batch of GitHub issues, use `ONLY_ROUND2=1` with `scripts/create-issues.sh`.
+The script is not run automatically.

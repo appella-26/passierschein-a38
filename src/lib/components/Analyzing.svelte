@@ -8,9 +8,9 @@
   onMount(() => window.scrollTo({ top: 0, behavior: 'instant' }));
 </script>
 
-<div class="space-y-5" aria-busy="true">
+<div class="space-y-6" aria-busy="true">
   <div class="flex flex-wrap items-center justify-between gap-2"><span role="status" class="inline-flex items-center gap-2 rounded-full bg-surface-container-high px-3 py-2 text-label-md"><span class="size-2 animate-pulse rounded-full bg-secondary"></span>{t(preparing ? 'preparing' : 'analyzing')}</span><span class="inline-flex items-center gap-1 text-label-sm text-on-surface-variant"><Icon name="lock" size={16} />{t('analyzingPrivate')}</span></div>
-  <div class="grid gap-5 md:grid-cols-[1fr_1.1fr]">
+  <div class="grid items-start gap-6 lg:grid-cols-[1fr_1.1fr]">
     <div class="relative mx-auto aspect-[3/4] max-h-[400px] w-full overflow-hidden rounded-2xl border border-surface-container bg-white p-5 shadow-paper">
       {#if preview}<img src={preview} alt={t('page', { number: 1 })} class="absolute inset-0 size-full object-contain opacity-65" />{:else}<div class="space-y-5 pt-5" aria-hidden="true"><div class="h-3 w-32 rounded bg-outline-variant/60"></div><div class="space-y-2"><div class="h-2 w-24 rounded bg-surface-container-highest"></div><div class="h-2 w-36 rounded bg-surface-container-highest"></div></div><div class="h-10 rounded bg-surface-container-low"></div><div class="space-y-3">{#each Array(8) as _, i}<div class="h-2 rounded bg-outline-variant/40" style:width={`${100 - i % 3 * 12}%`}></div>{/each}</div></div>{/if}
       <div class="absolute right-3 top-3 inline-flex items-center gap-2 rounded-full bg-primary px-3 py-2 text-label-sm text-white"><Icon name="scan" size={15} />{t('scanActive')}</div>

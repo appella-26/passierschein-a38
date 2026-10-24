@@ -4,7 +4,7 @@ export function formatDate(value: string | null, short = false): string {
   if (!value) return '—';
   const date = new Date(value.length === 10 ? `${value}T12:00:00` : value);
   if (Number.isNaN(date.getTime())) return '—';
-  return new Intl.DateTimeFormat(language.current === 'de' ? 'de-DE' : 'en-GB', { day: 'numeric', month: short ? 'short' : 'long', ...(short ? {} : { year: 'numeric' }) }).format(date);
+  return new Intl.DateTimeFormat(language.current === 'de' ? 'de-DE' : 'en-GB', { day: 'numeric', month: short ? 'short' : 'long', year: 'numeric' }).format(date);
 }
 
 /** Calendar-day difference, without DST or time-of-day rounding errors. */

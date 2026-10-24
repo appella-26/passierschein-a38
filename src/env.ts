@@ -5,9 +5,14 @@ import { defineEnvVars } from '@sveltejs/kit/env';
 const optional = (fallback: string) => (v: string | undefined) => (v && v.trim() ? v.trim() : fallback);
 
 export const variables = defineEnvVars({
-	// Gemma (local, via Ollama)
+	// Letter analysis: hosted Gemma via Gemini API by default, or local Ollama.
+	GEMMA_PROVIDER: { schema: optional('gemini'), description: 'gemini or ollama' },
+	GEMINI_API_KEY: { schema: optional('') },
+	GEMINI_MODEL: { schema: optional('models/gemma-4-26b-a4b-it') },
 	OLLAMA_URL: { schema: optional('http://localhost:11434') },
 	GEMMA_MODEL: { schema: optional('gemma4:26b') },
+	// Embeddings are used only with GEMMA_PROVIDER=ollama. Leave the default for
+	// local semantic search, or set it to an empty value to use FTS-only search.
 	EMBED_MODEL: { schema: optional('embeddinggemma') },
 	DATA_DIR: { schema: optional('data') },
 

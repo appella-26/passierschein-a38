@@ -1,18 +1,26 @@
 import { test, expect, type Page } from '@playwright/test';
-import { mockDocuments, mockRows, mockGraph } from '../src/lib/mock/data.ts';
+import { getMockDocuments, mockDocuments, mockRows, mockGraph } from '../src/lib/mock/data.ts';
 
 const sample = mockDocuments[0];
 const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=', 'base64');
 
-async function mockApi(page: Page) {
-  await page.route('**/api/documents*', route => route.fulfill({ json: mockRows(new URL(route.request().url()).searchParams.get('q') ?? '') }));
+async function mockApi(page: Page, lang: 'de' | 'en' = 'de') {
+  await page.route('**/api/documents*', route => route.fulfill({ json: mockRows(new URL(route.request().url()).searchParams.get('q') ?? '', lang) }));
   await page.route('**/api/documents/*', route => {
     const id = new URL(route.request().url()).pathname.split('/').at(-1);
-    const doc = mockDocuments.find(item => item.id === id);
+    const doc = getMockDocuments(lang).find(item => item.id === id);
     return route.fulfill({ status: doc ? 200 : 404, json: doc ?? {} });
   });
-  await page.route('**/api/graph', route => route.fulfill({ json: mockGraph() }));
+  await page.route('**/api/documents/*/pages/*', route => route.fulfill({ contentType: 'image/png', body: tinyPng }));
+  await page.route('**/api/graph', route => route.fulfill({ json: mockGraph(lang) }));
 }
+
+test.describe('German workflows', () => {
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    if (!localStorage.getItem('appella.language')) localStorage.setItem('appella.language', 'de');
+  });
+});
 
 test('upload resizes images, shows analysis, and navigates to a result', async ({ page }) => {
   await mockApi(page);
@@ -52,10 +60,10 @@ test('language and checklist persist, clipboard and original scans work', async 
   await expect(page.getByRole('heading', { name: 'Your next steps' })).toBeVisible();
   await expect(page.getByRole('checkbox').first()).toBeChecked();
   await page.route('**/api/documents/*/pages/*', route => route.fulfill({ contentType: 'image/png', body: tinyPng }));
-  await page.getByRole('button', { name: 'View original scan' }).click();
+  await page.getByRole('button', { name: 'See the original' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.getByRole('button', { name: 'Page 2', exact: true }).click();
-  await expect(page.getByRole('img', { name: 'Original scan · Page 2' })).toHaveAttribute('src', `/api/documents/${sample.id}/pages/2`);
+  await expect(page.getByRole('img', { name: 'Original letter · Page 2' })).toHaveAttribute('src', `/api/documents/${sample.id}/pages/2`);
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).not.toBeVisible();
 });
@@ -200,20 +208,231 @@ test('demo preview cannot call the backend and captures analyzing, confirmation 
   await page.screenshot({ path: testInfo.outputPath('human-390.png'), fullPage: true });
   expect(apiRequests).toEqual([]);
 });
+});
 
-for (const width of [390, 1366]) {
-  test(`screens render without browser errors or horizontal overflow at ${width}px`, async ({ page }, testInfo) => {
-    await page.setViewportSize({ width, height: 900 });
-    const errors: string[] = [];
-    page.on('pageerror', error => errors.push(error.message));
-    for (const [name, path] of [['home', '/?demo=1'], ['result', '/letters/demo-tax?demo=1'], ['call', '/calls/demo-call?demo=1'], ['archive', '/archive?demo=1'], ['graph', '/graph?demo=1']]) {
-      await page.goto(path);
-      await expect(page.locator('main')).toBeVisible();
-      await expect(page.getByText('Wird geladen…', { exact: true })).not.toBeVisible();
-      await page.evaluate(() => document.fonts.ready);
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-      await page.screenshot({ path: testInfo.outputPath(`${name}-${width}.png`), fullPage: true, style: 'body { position: relative; } header { position: static !important; } nav { position: absolute !important; }' });
-    }
-    expect(errors).toEqual([]);
+async function assertLayout(page: Page) {
+  const measurements = await page.evaluate(() => {
+    const main = document.querySelector('main')!;
+    const header = document.querySelector('header > .shell-container')!;
+    const style = getComputedStyle(main);
+    const headerStyle = getComputedStyle(header);
+    const dates = [...main.querySelectorAll('time')].filter(date => date.getBoundingClientRect().width > 0);
+    return {
+      overflows: document.documentElement.scrollWidth > window.innerWidth,
+      contentLeft: main.getBoundingClientRect().left + parseFloat(style.paddingLeft),
+      headerLeft: header.getBoundingClientRect().left + parseFloat(headerStyle.paddingLeft),
+      splitDates: dates.filter(date => date.getClientRects().length > 1).map(date => date.textContent)
+    };
+  });
+  expect(measurements.overflows).toBe(false);
+  expect(Math.abs(measurements.contentLeft - measurements.headerLeft)).toBeLessThan(1);
+  expect(measurements.splitDates).toEqual([]);
+}
+
+for (const width of [375, 390, 430, 768, 1366]) {
+  for (const lang of ['de', 'en'] as const) {
+    test(`actual sticky layouts at ${width}px in ${lang}`, async ({ page }, testInfo) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.clock.setFixedTime(new Date('2026-10-24T10:00:00Z'));
+      await page.addInitScript(value => localStorage.setItem('appella.language', value), lang);
+      const errors: string[] = [];
+      page.on('pageerror', error => errors.push(error.message));
+      const ui = lang === 'de'
+        ? { loading: 'Wird geladen…', camera: 'Kamera öffnen', files: 'Bilder auswählen', wait: 'In der Warteschleife warten', close: 'Schließen' }
+        : { loading: 'Loading…', camera: 'Take a photo', files: 'Choose images', wait: 'Hold the line for me', close: 'Close' };
+
+      for (const [name, path] of [['home', '/?demo=1'], ['result', '/letters/demo-tax?demo=1'], ['call', '/calls/demo-call?demo=1'], ['archive', '/archive?demo=1'], ['graph', '/graph?demo=1']]) {
+        await page.goto(path);
+        await expect(page.locator('main')).toBeVisible();
+        await expect(page.getByText(ui.loading, { exact: true })).not.toBeVisible();
+        await expect(page.locator('html')).toHaveAttribute('lang', lang);
+        await page.evaluate(() => document.fonts.ready);
+        if (name === 'home' || name === 'archive') await expect(page.locator('.letter-card').first()).toContainText('312,40 EUR');
+        if (name === 'graph') await expect(page.getByRole('button', { name: lang === 'de' ? 'Vergrößern' : 'Zoom in' })).toBeEnabled();
+        await assertLayout(page);
+        await expect(page.locator('header')).toHaveCSS('position', 'sticky');
+        if (name !== 'result' && name !== 'call') {
+          await expect(page.locator('nav')).toHaveCSS('position', 'fixed');
+          const nav = await page.locator('nav').boundingBox();
+          expect(Math.abs(nav!.y + nav!.height - 900)).toBeLessThan(1);
+        }
+        await page.screenshot({ path: testInfo.outputPath(`${name}-${width}-${lang}.png`) });
+
+        if (name === 'home') {
+          for (const label of [ui.camera, ui.files]) {
+            const button = page.getByRole('button', { name: label, exact: true });
+            const bounds = await button.boundingBox();
+            expect(bounds!.height).toBeGreaterThanOrEqual(44);
+            expect(bounds!.height).toBeLessThanOrEqual(52);
+          }
+          await page.locator('input[type=file][multiple]').setInputFiles([
+            { name: 'page-1.png', mimeType: 'image/png', buffer: tinyPng },
+            { name: 'page-2.png', mimeType: 'image/png', buffer: tinyPng }
+          ]);
+          await expect(page.locator('main img')).toHaveCount(2);
+          await assertLayout(page);
+          await page.screenshot({ path: testInfo.outputPath(`upload-${width}-${lang}.png`) });
+        }
+        if (name === 'result') {
+          const summary = page.getByRole('heading', { name: lang === 'de' ? 'Klartext-Zusammenfassung' : 'The short version' }).locator('..');
+          const bounds = await summary.boundingBox();
+          const main = await page.locator('main').boundingBox();
+          expect(bounds!.width).toBeGreaterThan(main!.width * 0.85);
+          await expect(page.locator('main .relative > .absolute').first()).toHaveCSS('margin-bottom', '0px');
+          await page.getByRole('heading', { name: lang === 'de' ? 'Ihre To-Dos' : 'Your next steps' }).evaluate(element => element.scrollIntoView({ block: 'start' }));
+          await page.screenshot({ path: testInfo.outputPath(`result-actions-${width}-${lang}.png`) });
+          await page.getByRole('button', { name: ui.wait, exact: true }).click();
+          const sheet = page.getByRole('dialog');
+          await expect(sheet).toBeVisible();
+          expect((await sheet.boundingBox())!.width).toBeLessThanOrEqual(width);
+          await page.screenshot({ path: testInfo.outputPath(`confirmation-${width}-${lang}.png`) });
+          await sheet.evaluate(element => element.scrollTop = element.scrollHeight);
+          await page.screenshot({ path: testInfo.outputPath(`confirmation-actions-${width}-${lang}.png`) });
+          await sheet.getByRole('button', { name: ui.close, exact: true }).click();
+        }
+        if (name === 'archive') {
+          const action = await page.locator('.archive-action').boundingBox();
+          const nav = await page.locator('nav').boundingBox();
+          expect(Math.abs(action!.y + action!.height - nav!.y)).toBeLessThan(1);
+          await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+          const lastCard = await page.locator('.letter-card').last().boundingBox();
+          expect(lastCard!.y + lastCard!.height).toBeLessThanOrEqual(action!.y);
+          await page.screenshot({ path: testInfo.outputPath(`archive-bottom-${width}-${lang}.png`) });
+        }
+      }
+      expect(errors).toEqual([]);
+    });
+  }
+}
+
+test('long sender names and references wrap without losing data', async ({ page, context }) => {
+  await page.addInitScript(() => localStorage.setItem('appella.language', 'de'));
+  await mockApi(page);
+  await page.setViewportSize({ width: 375, height: 900 });
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  const value = 'AZ-2026-' + '1234567890'.repeat(6);
+  const doc = structuredClone(sample);
+  doc.analysis.sender.name = 'Landesamt für Bürger- und Ordnungsangelegenheiten Berlin';
+  doc.analysis.references = [{ label: 'Versicherungsnummer', value }];
+  await page.route('**/api/documents/*', route => route.fulfill({ json: doc }));
+  await page.goto(`/letters/${sample.id}`);
+  const chip = page.getByRole('button', { name: 'Versicherungsnummer kopieren' });
+  await expect(chip).toContainText(value);
+  await assertLayout(page);
+  await chip.click();
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(value);
+  await page.getByRole('button', { name: 'In der Warteschleife warten', exact: true }).click();
+  const sheet = page.getByRole('dialog');
+  await expect(sheet).toBeVisible();
+  await expect(sheet.locator('dd')).toHaveText(value);
+  expect(await sheet.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+});
+
+test('English is the first-paint default and new analyses request English', async ({ page, request }) => {
+  const response = await request.get('/');
+  const html = await response.text();
+  expect(html).toContain('<html lang="en">');
+  expect(html).toContain('Let’s untangle this.');
+  await mockApi(page, 'en');
+  const doc = getMockDocuments('en')[0];
+  let payload: { images: string[]; lang: string } | undefined;
+  await page.route('**/api/analyze', route => {
+    payload = route.request().postDataJSON();
+    return route.fulfill({ json: { id: doc.id, analysis: doc.analysis, related: doc.related } });
+  });
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Let’s untangle this.' })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.getByRole('button', { name: 'English', exact: true })).toHaveAttribute('aria-pressed', 'true');
+  await page.locator('input[type=file][multiple]').setInputFiles({ name: 'letter.png', mimeType: 'image/png', buffer: tinyPng });
+  await page.getByRole('button', { name: 'Explain this page', exact: true }).click();
+  await expect.poll(() => payload?.lang).toBe('en');
+  await expect(page).toHaveURL(`/letters/${doc.id}`);
+  await expect(page.getByRole('heading', { name: doc.document_type, exact: true })).toBeVisible();
+});
+
+test('saved German wins over the default and switching languages updates demo copy', async ({ page }) => {
+  await page.addInitScript(() => {
+    if (!localStorage.getItem('appella.language')) localStorage.setItem('appella.language', 'de');
+  });
+  await page.goto('/?demo=1');
+  await expect(page.getByRole('heading', { name: 'Guten Tag' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: sample.document_type, exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'English', exact: true }).click();
+  await expect(page.getByRole('heading', { name: getMockDocuments('en')[0].document_type, exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+  await expect(page.getByRole('heading', { name: 'Let’s untangle this.' })).toBeVisible();
+  await page.goto('/letters/demo-tax?demo=1');
+  await expect(page.getByText('Pay the outstanding €312.40', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Deutsch', exact: true }).click();
+  await expect(page.getByRole('heading', { name: sample.document_type, exact: true })).toBeVisible();
+});
+
+for (const unavailable of [false, true]) {
+  test(`English fallback when language preference is ${unavailable ? 'unavailable' : 'invalid'}`, async ({ page }) => {
+    await page.addInitScript(disabled => {
+      if (!disabled) { localStorage.setItem('appella.language', 'fr'); return; }
+      const get = Storage.prototype.getItem;
+      const set = Storage.prototype.setItem;
+      Storage.prototype.getItem = function (key) { if (key === 'appella.language') throw new Error('Storage unavailable'); return get.call(this, key); };
+      Storage.prototype.setItem = function (key, value) { if (key === 'appella.language') throw new Error('Storage unavailable'); set.call(this, key, value); };
+    }, unavailable);
+    await page.goto('/?demo=1');
+    await expect(page.getByRole('heading', { name: 'Let’s untangle this.' })).toBeVisible();
+    await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   });
 }
+
+test('English demo keeps call purposes in German and never dials a real number', async ({ page }, testInfo) => {
+  const requests: string[] = [];
+  page.on('request', request => { if (new URL(request.url()).pathname.startsWith('/api/')) requests.push(request.url()); });
+  await page.goto('/letters/demo-tax?demo=1');
+  await page.getByRole('button', { name: 'Hold the line for me', exact: true }).click();
+  const purpose = page.getByRole('textbox', { name: 'Reason for calling' });
+  await expect(purpose).toHaveAttribute('lang', 'de');
+  await expect(purpose).toHaveValue(sample.analysis.action_items[2].call_purpose_de!);
+  await page.getByRole('dialog').getByRole('checkbox').check();
+  await page.getByRole('button', { name: 'Start the call', exact: true }).click();
+  await page.getByLabel('Try a call status').selectOption('human_detected');
+  await expect(page.getByRole('heading', { name: 'You’re up.' })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('human-english.png') });
+  expect(requests).toEqual([]);
+});
+
+test('demo translations preserve printed facts and support bilingual search', () => {
+  const english = getMockDocuments('en');
+  for (const original of mockDocuments) {
+    const translated = english.find(doc => doc.id === original.id)!;
+    expect(translated.sender_name).toBe(original.sender_name);
+    expect(translated.letter_date).toBe(original.letter_date);
+    expect(translated.deadline).toBe(original.deadline);
+    expect(translated.analysis.references).toEqual(original.analysis.references);
+    expect(translated.analysis.amount_due).toBe(original.analysis.amount_due);
+    expect(translated.analysis.action_items.map(action => ({ type: action.type, due: action.due, phone: action.phone, phone_raw: action.phone_raw, purpose: action.call_purpose_de })))
+      .toEqual(original.analysis.action_items.map(action => ({ type: action.type, due: action.due, phone: action.phone, phone_raw: action.phone_raw, purpose: action.call_purpose_de })));
+  }
+  expect(mockRows('Steuerbescheid', 'en').some(doc => doc.id === 'demo-tax')).toBe(true);
+  expect(mockRows('income tax', 'de').some(doc => doc.id === 'demo-tax')).toBe(true);
+});
+
+test('chat helper follows the UI language and has English fallback labels', async ({ page }) => {
+  const languages: string[] = [];
+  await page.route('**/api/chat', route => {
+    languages.push(route.request().postDataJSON().lang);
+    return route.fulfill({ status: 503, json: {} });
+  });
+  await page.goto('/?demo=1');
+  await expect(page.getByRole('heading', { name: 'Let’s untangle this.' })).toBeVisible();
+  const result = await page.evaluate(async () => {
+    const path = '/src/lib/assistant-client.ts';
+    const { streamChat, splitRefs } = await import(path);
+    const errors: { type: string; message?: string }[] = [];
+    await streamChat({ messages: [{ role: 'user', content: 'What needs my attention?' }] }, (event: { type: string; message?: string }) => errors.push(event));
+    await streamChat({ messages: [{ role: 'user', content: 'Was ist offen?' }], lang: 'de' }, () => {});
+    return { errors, refs: splitRefs('[[letter:unknown]] [[case:unknown]]', { letters: {}, cases: {} }) };
+  });
+  expect(languages).toEqual(['en', 'de']);
+  expect(result.errors[0].message).toBe('We couldn’t reach the assistant (error 503). Try again.');
+  expect(result.refs.filter((ref: { kind: string }) => ref.kind !== 'text').map((ref: { label: string }) => ref.label)).toEqual(['Letter', 'Case']);
+});
