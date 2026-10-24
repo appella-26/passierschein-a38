@@ -4,6 +4,14 @@ import { getMockDocuments, mockDocuments, mockRows, mockGraph } from '../src/lib
 const sample = mockDocuments[0];
 const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=', 'base64');
 
+/** setInputFiles before hydration fires a change event no handler hears, so retry until the page lists it. */
+async function addPage(page: Page, listed: string, name = 'sample.png') {
+  await expect(async () => {
+    await page.locator('input[type=file][multiple]').setInputFiles({ name, mimeType: 'image/png', buffer: tinyPng });
+    await expect(page.getByText(listed, { exact: true })).toBeVisible({ timeout: 1000 });
+  }).toPass();
+}
+
 async function mockApi(page: Page, lang: 'de' | 'en' = 'de') {
   await page.route('**/api/documents*', route => route.fulfill({ json: mockRows(new URL(route.request().url()).searchParams.get('q') ?? '', lang) }));
   await page.route('**/api/documents/*', route => {
@@ -15,15 +23,39 @@ async function mockApi(page: Page, lang: 'de' | 'en' = 'de') {
   await page.route('**/api/graph', route => route.fulfill({ json: mockGraph(lang) }));
 }
 
-test.describe('German workflows', () => {
-test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => {
-    if (!localStorage.getItem('appella.language')) localStorage.setItem('appella.language', 'de');
-  });
-});
+const workflowCopy = {
+  en: {
+    pages: 'Your pages (1)', analyzeOne: 'Explain this page', analyzing: 'Reading your letter…', analysisError: 'We couldn’t finish reading this letter.',
+    cancelAnalysis: 'Back to your pages', capture: 'Add a letter', completeAction: 'Mark as complete:', copyReference: 'Copy Steuernummer', copied: 'Copied. One less thing to type.',
+    waitForMe: 'Hold the line for me', startCall: 'Start the call', phone: 'Phone number', dialing: 'Dialling…', ivr: 'Working through the phone menu',
+    waitingTime: 'Time on hold', humanTitle: 'You’re up.', connected: 'You’re connected', voicemail: 'Voicemail reached', cancelCall: 'End call', ended: 'Call ended', failed: 'Call failed',
+    taxOffice: /^Tax office/, all: /^All letters/, noResults: 'Nothing turned up.', resetFilters: 'Clear search & filters', zoomIn: 'Zoom in', connections: '2 linked letters',
+    previewAnalysis: 'See how it works', demoCallState: 'Try a call status',
+    other: { button: 'Deutsch', todos: 'Ihre To-Dos', original: 'Original-Scan ansehen', page2: 'Seite 2', originalPage2: 'Original-Scan · Seite 2' }
+  },
+  de: {
+    pages: 'Erfasste Seiten (1)', analyzeOne: '1 Seite jetzt analysieren', analyzing: 'Analyse läuft', analysisError: 'Die Analyse ist fehlgeschlagen.',
+    cancelAnalysis: 'Zur Erfassung zurück', capture: 'Brief erfassen', completeAction: 'Als erledigt markieren:', copyReference: 'Steuernummer kopieren', copied: 'In die Zwischenablage kopiert',
+    waitForMe: 'In der Warteschleife warten', startCall: 'Anruf starten & Warteschleife übergeben', phone: 'Rufnummer', dialing: 'Nummer wird gewählt', ivr: 'Telefonmenü wird durchlaufen',
+    waitingTime: 'Zeit in der Warteschleife', humanTitle: 'Jemand ist für Sie da.', connected: 'Sie sind verbunden', voicemail: 'Anrufbeantworter erreicht', cancelCall: 'Anruf beenden', ended: 'Anruf beendet', failed: 'Anruf fehlgeschlagen',
+    taxOffice: /^Finanzamt/, all: /^Alle/, noResults: 'Keine Briefe gefunden', resetFilters: 'Filter zurücksetzen', zoomIn: 'Vergrößern', connections: '2 verknüpfte Briefe',
+    previewAnalysis: 'Analyse-Vorschau', demoCallState: 'Demo-Anrufstatus',
+    other: { button: 'English', todos: 'Your next steps', original: 'See the original', page2: 'Page 2', originalPage2: 'Original letter · Page 2' }
+  }
+} as const;
 
+for (const lang of ['en', 'de'] as const) {
+test.describe(`${lang === 'en' ? 'English' : 'German'} workflows`, () => {
+const sample = getMockDocuments(lang)[0];
+const rent = getMockDocuments(lang).find(doc => doc.id === 'demo-rent')!;
+const ui = workflowCopy[lang];
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(value => {
+    if (!localStorage.getItem('appella.language')) localStorage.setItem('appella.language', value);
+  }, lang);
+});
 test('upload resizes images, shows analysis, and navigates to a result', async ({ page }) => {
-  await mockApi(page);
+  await mockApi(page, lang);
   let finish!: () => void;
   const waiting = new Promise<void>(resolve => finish = resolve);
   let payload: { images: string[]; lang: string } | undefined;
@@ -33,11 +65,10 @@ test('upload resizes images, shows analysis, and navigates to a result', async (
     await route.fulfill({ json: { id: sample.id, analysis: sample.analysis, related: sample.related } });
   });
   await page.goto('/');
-  await page.locator('input[type=file][multiple]').setInputFiles({ name: 'sample.png', mimeType: 'image/png', buffer: tinyPng });
-  await expect(page.getByText('Erfasste Seiten (1)')).toBeVisible();
-  await page.getByRole('button', { name: '1 Seite jetzt analysieren', exact: true }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Analyse läuft' })).toBeVisible();
-  await expect.poll(() => payload?.lang).toBe('de');
+  await addPage(page, ui.pages);
+  await page.getByRole('button', { name: ui.analyzeOne, exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: ui.analyzing })).toBeVisible();
+  await expect.poll(() => payload?.lang).toBe(lang);
   expect(payload?.images[0]).toMatch(/^\/9j\//);
   expect(payload?.images[0]).not.toContain('data:');
   finish();
@@ -46,36 +77,36 @@ test('upload resizes images, shows analysis, and navigates to a result', async (
 });
 
 test('language and checklist persist, clipboard and original scans work', async ({ page, context }) => {
-  await mockApi(page);
+  await mockApi(page, lang);
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto(`/letters/${sample.id}`);
-  const check = page.getByRole('checkbox', { name: `Als erledigt markieren: ${sample.analysis.action_items[0].title}` });
+  const check = page.getByRole('checkbox', { name: `${ui.completeAction} ${sample.analysis.action_items[0].title}` });
   await check.check();
-  await page.getByRole('button', { name: 'Steuernummer kopieren' }).click();
-  await expect(page.getByRole('status')).toHaveText('In die Zwischenablage kopiert');
+  await page.getByRole('button', { name: ui.copyReference }).click();
+  await expect(page.getByRole('status')).toHaveText(ui.copied);
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('37 012 345 67');
-  await page.getByRole('button', { name: 'English', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Your next steps' })).toBeVisible();
+  await page.getByRole('button', { name: ui.other.button, exact: true }).click();
+  await expect(page.getByRole('heading', { name: ui.other.todos })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Your next steps' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: ui.other.todos })).toBeVisible();
   await expect(page.getByRole('checkbox').first()).toBeChecked();
   await page.route('**/api/documents/*/pages/*', route => route.fulfill({ contentType: 'image/png', body: tinyPng }));
-  await page.getByRole('button', { name: 'See the original' }).click();
+  await page.getByRole('button', { name: ui.other.original }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
-  await page.getByRole('button', { name: 'Page 2', exact: true }).click();
-  await expect(page.getByRole('img', { name: 'Original letter · Page 2' })).toHaveAttribute('src', `/api/documents/${sample.id}/pages/2`);
+  await page.getByRole('button', { name: ui.other.page2, exact: true }).click();
+  await expect(page.getByRole('img', { name: ui.other.originalPage2 })).toHaveAttribute('src', `/api/documents/${sample.id}/pages/2`);
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).not.toBeVisible();
 });
 
 test('analysis errors retain uploads and cancelling does not navigate to a late result', async ({ page }) => {
-  await mockApi(page);
+  await mockApi(page, lang);
   await page.route('**/api/analyze', route => route.fulfill({ status: 502, json: { message: 'Ollama unavailable' } }));
   await page.goto('/');
-  await page.locator('input[type=file][multiple]').setInputFiles({ name: 'sample.png', mimeType: 'image/png', buffer: tinyPng });
-  await page.getByRole('button', { name: '1 Seite jetzt analysieren', exact: true }).click();
-  await expect(page.getByRole('alert')).toContainText('Die Analyse ist fehlgeschlagen.');
-  await expect(page.getByText('Erfasste Seiten (1)')).toBeVisible();
+  await addPage(page, ui.pages);
+  await page.getByRole('button', { name: ui.analyzeOne, exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText(ui.analysisError);
+  await expect(page.getByText(ui.pages)).toBeVisible();
   await page.unroute('**/api/analyze');
   let finish!: () => void;
   const waiting = new Promise<void>(resolve => finish = resolve);
@@ -83,26 +114,26 @@ test('analysis errors retain uploads and cancelling does not navigate to a late 
     await waiting;
     await route.fulfill({ json: { id: sample.id, analysis: sample.analysis, related: sample.related } }).catch(() => {});
   });
-  await page.getByRole('button', { name: '1 Seite jetzt analysieren', exact: true }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Analyse läuft' })).toBeVisible();
-  await page.getByRole('button', { name: 'Zur Erfassung zurück', exact: true }).click();
+  await page.getByRole('button', { name: ui.analyzeOne, exact: true }).click();
+  await expect(page.getByRole('status').filter({ hasText: ui.analyzing })).toBeVisible();
+  await page.getByRole('button', { name: ui.cancelAnalysis, exact: true }).click();
   finish();
-  await expect(page.getByRole('heading', { name: 'Brief erfassen', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: ui.capture, exact: true })).toBeVisible();
   await expect(page).toHaveURL('/');
 });
 
 test('call confirmation sends only reviewed metadata and requires consent', async ({ page }) => {
-  await mockApi(page);
+  await mockApi(page, lang);
   let payload: Record<string, unknown> | undefined;
   await page.route('**/api/calls', route => { payload = route.request().postDataJSON(); return route.fulfill({ json: { id: 'test-call', state: 'dialing' } }); });
   await page.route('**/api/calls/test-call/events', route => route.fulfill({ contentType: 'text/event-stream', body: `data: ${JSON.stringify({ state: 'on_hold', at: new Date().toISOString() })}\n\n` }));
   await page.goto(`/letters/${sample.id}`);
-  await page.getByRole('button', { name: 'In der Warteschleife warten', exact: true }).click();
+  await page.getByRole('button', { name: ui.waitForMe, exact: true }).click();
   const sheet = page.getByRole('dialog');
   await expect(sheet).toBeVisible();
-  const start = sheet.getByRole('button', { name: 'Anruf starten & Warteschleife übergeben', exact: true });
+  const start = sheet.getByRole('button', { name: ui.startCall, exact: true });
   await expect(start).toBeDisabled();
-  await sheet.getByLabel('Rufnummer', { exact: true }).fill('0621 / 292-0');
+  await sheet.getByLabel(ui.phone, { exact: true }).fill('0621 / 292-0');
   await sheet.getByRole('checkbox').check();
   await start.click();
   await expect(page).toHaveURL('/calls/test-call');
@@ -114,7 +145,7 @@ test('call confirmation sends only reviewed metadata and requires consent', asyn
 });
 
 test('all live call states render and cancellation uses the endpoint', async ({ page }) => {
-  await mockApi(page);
+  await mockApi(page, lang);
   await page.addInitScript(() => {
     class FakeEventSource {
       static CLOSED = 2;
@@ -134,55 +165,55 @@ test('all live call states render and cancellation uses the endpoint', async ({ 
   await page.goto('/calls/test-call');
   await page.waitForFunction(() => typeof (window as unknown as { emitCall: unknown }).emitCall === 'function');
   async function emit(state: string) { await page.evaluate(value => (window as unknown as { emitCall: (s: string) => void }).emitCall(value), state); }
-  await expect(page.getByRole('status').filter({ hasText: 'Nummer wird gewählt' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: ui.dialing })).toBeVisible();
   await emit('ivr');
-  await expect(page.getByRole('status').filter({ hasText: 'Telefonmenü wird durchlaufen' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: ui.ivr })).toBeVisible();
   await emit('on_hold');
-  await expect(page.getByText('Zeit in der Warteschleife')).toBeVisible();
+  await expect(page.getByText(ui.waitingTime)).toBeVisible();
   await emit('human_detected');
-  await expect(page.getByRole('heading', { name: 'Jemand ist für Sie da.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: ui.humanTitle })).toBeVisible();
   await expect.poll(() => page.evaluate(() => (window as unknown as { didVibrate: boolean }).didVibrate)).toBe(true);
   await emit('transferring');
-  await expect(page.getByRole('heading', { name: 'Jemand ist für Sie da.' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: ui.humanTitle })).toBeVisible();
   await emit('connected');
-  await expect(page.getByRole('heading', { name: 'Sie sind verbunden' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: ui.connected })).toBeVisible();
   await emit('voicemail');
-  await expect(page.getByRole('heading', { name: 'Anrufbeantworter erreicht' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: ui.voicemail })).toBeVisible();
   let cancelled = false;
   await page.route('**/api/calls/test-call/cancel', async route => { cancelled = true; await route.fulfill({ json: { ok: true } }); });
-  await page.getByRole('button', { name: 'Anruf beenden', exact: true }).click();
+  await page.getByRole('button', { name: ui.cancelCall, exact: true }).click();
   await expect.poll(() => cancelled).toBe(true);
   await emit('ended');
-  await expect(page.getByRole('heading', { name: 'Anruf beendet' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: ui.ended })).toBeVisible();
   await page.reload();
   await page.waitForFunction(() => typeof (window as unknown as { emitCall: unknown }).emitCall === 'function');
-  await expect(page.getByRole('status').filter({ hasText: 'Nummer wird gewählt' })).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: ui.dialing })).toBeVisible();
   await emit('failed');
-  await expect(page.getByRole('heading', { name: 'Anruf fehlgeschlagen' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: ui.failed })).toBeVisible();
 });
 
 test('archive search is debounced, filters combine with search, and graph documents navigate', async ({ page }) => {
-  await mockApi(page);
+  await mockApi(page, lang);
   const queries: string[] = [];
   page.on('request', request => { const url = new URL(request.url()); if (url.pathname === '/api/documents' && url.searchParams.has('q')) queries.push(url.searchParams.get('q')!); });
   await page.goto('/archive');
   await expect(page.getByRole('heading', { name: sample.document_type, exact: true })).toBeVisible();
-  await page.getByRole('button', { name: /^Finanzamt/ }).click();
-  await expect(page.getByRole('heading', { name: 'Betriebskostenabrechnung 2025' })).not.toBeVisible();
-  await page.getByRole('button', { name: /^Alle/ }).click();
+  await page.getByRole('button', { name: ui.taxOffice }).click();
+  await expect(page.getByRole('heading', { name: rent.document_type })).not.toBeVisible();
+  await page.getByRole('button', { name: ui.all }).click();
   const search = page.getByRole('searchbox');
   await search.fill('t'); await search.fill('ta'); await search.fill('tax');
   await expect(page.getByRole('heading', { name: sample.document_type, exact: true })).toBeVisible();
   await expect.poll(() => queries).toEqual(['tax']);
   await search.fill('no-such-letter');
-  await expect(page.getByRole('heading', { name: 'Keine Briefe gefunden' })).toBeVisible();
-  await page.getByRole('button', { name: 'Filter zurücksetzen', exact: true }).click();
+  await expect(page.getByRole('heading', { name: ui.noResults })).toBeVisible();
+  await page.getByRole('button', { name: ui.resetFilters, exact: true }).click();
   await expect(page.getByRole('heading', { name: sample.document_type, exact: true })).toBeVisible();
   await page.goto('/graph');
   await expect(page.locator('canvas').first()).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Vergrößern' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: ui.zoomIn })).toBeEnabled();
   await page.getByRole('button', { name: sample.sender_name, exact: true }).click();
-  await expect(page.getByText('2 verknüpfte Briefe')).toBeVisible();
+  await expect(page.getByText(ui.connections)).toBeVisible();
   await page.getByRole('link', { name: sample.document_type, exact: true }).first().click();
   await expect(page).toHaveURL(`/letters/${sample.id}`);
 });
@@ -191,24 +222,25 @@ test('demo preview cannot call the backend and captures analyzing, confirmation 
   const apiRequests: string[] = [];
   page.on('request', request => { if (new URL(request.url()).pathname.startsWith('/api/')) apiRequests.push(request.url()); });
   await page.goto('/?demo=1');
-  await page.getByRole('button', { name: 'Analyse-Vorschau' }).click();
-  await expect(page.getByRole('status').filter({ hasText: 'Analyse läuft' })).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath('analyzing-390.png'), fullPage: true });
+  await page.getByRole('button', { name: ui.previewAnalysis }).click();
+  await expect(page.getByRole('status').filter({ hasText: ui.analyzing })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath(`analyzing-390-${lang}.png`), fullPage: true });
   await page.goto('/letters/demo-tax?demo=1');
-  await page.getByRole('button', { name: 'In der Warteschleife warten', exact: true }).click();
-  await page.screenshot({ path: testInfo.outputPath('confirmation-390.png') });
+  await page.getByRole('button', { name: ui.waitForMe, exact: true }).click();
+  await page.screenshot({ path: testInfo.outputPath(`confirmation-390-${lang}.png`) });
   await page.getByRole('dialog').getByRole('checkbox').check();
-  await page.getByRole('dialog').getByRole('button', { name: 'Anruf starten & Warteschleife übergeben', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: ui.startCall, exact: true }).click();
   await expect(page).toHaveURL('/calls/demo-call?demo=1');
-  await page.getByLabel('Demo-Anrufstatus').selectOption('on_hold');
-  await expect(page.getByText('Zeit in der Warteschleife')).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath('on-hold-390.png'), fullPage: true });
-  await page.getByLabel('Demo-Anrufstatus').selectOption('human_detected');
-  await expect(page.getByRole('heading', { name: 'Jemand ist für Sie da.' })).toBeVisible();
-  await page.screenshot({ path: testInfo.outputPath('human-390.png'), fullPage: true });
+  await page.getByLabel(ui.demoCallState).selectOption('on_hold');
+  await expect(page.getByText(ui.waitingTime)).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath(`on-hold-390-${lang}.png`), fullPage: true });
+  await page.getByLabel(ui.demoCallState).selectOption('human_detected');
+  await expect(page.getByRole('heading', { name: ui.humanTitle })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath(`human-390-${lang}.png`), fullPage: true });
   expect(apiRequests).toEqual([]);
 });
 });
+}
 
 async function assertLayout(page: Page) {
   const measurements = await page.evaluate(() => {
@@ -344,7 +376,7 @@ test('English is the first-paint default and new analyses request English', asyn
   await expect(page.getByRole('heading', { name: 'Let’s untangle this.' })).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await expect(page.getByRole('button', { name: 'English', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await page.locator('input[type=file][multiple]').setInputFiles({ name: 'letter.png', mimeType: 'image/png', buffer: tinyPng });
+  await addPage(page, 'Your pages (1)', 'letter.png');
   await page.getByRole('button', { name: 'Explain this page', exact: true }).click();
   await expect.poll(() => payload?.lang).toBe('en');
   await expect(page).toHaveURL(`/letters/${doc.id}`);
