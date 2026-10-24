@@ -7,7 +7,7 @@ export default defineConfig({
   timeout: 30000,
   expect: { timeout: 10000 },
   use: { baseURL: 'http://127.0.0.1:5173', viewport: { width: 390, height: 844 }, trace: 'retain-on-failure' },
-  webServer: {
+  webServer: [{
     command: 'pnpm dev --host 127.0.0.1',
     url: 'http://127.0.0.1:5173',
     reuseExistingServer: !process.env.CI,
@@ -29,6 +29,24 @@ export default defineConfig({
       DEMO_TARGET_NUMBER: '',
       CALL_POLL_MS: '250'
     }
-  },
+  }, {
+    // A second app without a phone number, for the browser hotline (tests/browser-call.spec.ts).
+    command: 'pnpm dev --host 127.0.0.1 --port 5174 --strictPort',
+    url: 'http://127.0.0.1:5174',
+    reuseExistingServer: !process.env.CI,
+    env: {
+      ELEVENLABS_API_URL: 'http://127.0.0.1:5198',
+      ELEVENLABS_API_KEY: 'test-key',
+      ELEVENLABS_AGENT_ID: 'agent_test',
+      ELEVENLABS_PHONE_NUMBER_ID: '',
+      CALL_MODE: 'auto',
+      TWILIO_ACCOUNT_SID: '',
+      TWILIO_AUTH_TOKEN: '',
+      WEBHOOK_SECRET: 'test-secret',
+      USER_DISPLAY_NAME: 'Kevin',
+      DEMO_TARGET_NUMBER: '',
+      CALL_POLL_MS: '250'
+    }
+  }],
   reporter: 'list'
 });

@@ -9,10 +9,15 @@
 // Webhooks are fast but can arrive late or out of order; the transcript is complete and ordered but
 // polled. They are matched by order: the n-th webhook report is the n-th report_status call in the
 // transcript, so neither source replays what the other has already shown.
+//
+// Two ways to place a call (CALL_MODE):
+//  - phone: ElevenLabs dials the number over the imported Twilio number;
+//  - browser: no telephony. The call waits for a second device to open /hotline/<id> and "answer"; that
+//    page runs the same agent over WebRTC and plays the organisation. Free, for demos without a number.
 
 import * as env from '$app/env/private';
-import { randomUUID } from 'node:crypto';
-import { getConversation, startOutboundCall } from '#lib/server/elevenlabs.ts';
+import { randomBytes, randomUUID } from 'node:crypto';
+import { getConversation, getConversationToken, startOutboundCall } from '#lib/server/elevenlabs.ts';
 import { isFinished, readProgress, terminalStates, type Progress } from '#lib/server/call-progress.ts';
 
 export type CallState =
@@ -40,8 +45,13 @@ export interface CallInput {
 	letterDate?: string;
 }
 
+export type CallMode = 'phone' | 'browser';
+
 export interface Call extends CallInput {
 	id: string;
+	mode: CallMode;
+	/** browser mode: the agent's webhook secret for this call only, since the hotline page sees it */
+	webhookToken?: string;
 	conversationId?: string;
 	callSid?: string;
 	state: CallState;
@@ -105,6 +115,8 @@ export function reportState(id: string, state: CallState, note?: string) {
 
 /** Brings a call up to date with its transcript without repeating what the webhook already delivered. */
 function applyProgress(call: Call, { steps, reports, ending }: Progress, applied: Set<string>) {
+	// A browser call handed over in person is done for the app; the transcript can't change that.
+	if (call.mode === 'browser' && call.state === 'connected') return;
 	// Steps up to the last report the webhook delivered are already on screen, or superseded by it.
 	let covered = -1;
 	if (call.webhookReports > 0) {
@@ -140,23 +152,51 @@ export class CallSetupError extends Error {
 	}
 }
 
-export function missingConfig(): string[] {
-	const required = ['ELEVENLABS_API_KEY', 'ELEVENLABS_AGENT_ID', 'ELEVENLABS_PHONE_NUMBER_ID'] as const;
-	return required.filter((key) => !env[key]);
+/** CALL_MODE=auto (default) dials by phone once a number is imported, otherwise uses the browser hotline. */
+export function callMode(): CallMode {
+	if (env.CALL_MODE === 'phone' || env.CALL_MODE === 'browser') return env.CALL_MODE;
+	return env.ELEVENLABS_PHONE_NUMBER_ID ? 'phone' : 'browser';
+}
+
+export function missingConfig(mode = callMode()): string[] {
+	const required = ['ELEVENLABS_API_KEY', 'ELEVENLABS_AGENT_ID', ...(mode === 'phone' ? ['ELEVENLABS_PHONE_NUMBER_ID'] : [])] as const;
+	return required.filter((key) => !env[key as keyof typeof env]);
 }
 
 const message = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
 // ---------- ElevenLabs outbound call (native Twilio integration) ----------
 
+/** The variables every call hands the agent; `secret` fills the report_status webhook header. */
+function dynamicVariables(call: Call, secret: string): Record<string, string> {
+	return {
+		call_id: call.id,
+		user_name: env.USER_DISPLAY_NAME,
+		sender_name: call.senderName,
+		purpose: call.purpose,
+		reference: call.reference || 'keine Angabe',
+		letter_date: call.letterDate ?? '',
+		// The report_status tool sends this as its x-webhook-secret header.
+		// secret__ variables are never shown to the LLM.
+		secret__webhook_secret: secret
+	};
+}
+
 export async function startCall(input: CallInput): Promise<Call> {
-	const missing = missingConfig();
+	const mode = callMode();
+	const missing = missingConfig(mode);
 	if (missing.length) throw new CallSetupError(missing);
 
 	const id = randomUUID().slice(0, 8);
 	const now = new Date().toISOString();
-	const call: Call = { id, ...input, state: 'dialing', events: [{ state: 'dialing', at: now }], startedAt: now, webhookReports: 0, transcriptReports: 0 };
+	const call: Call = { id, mode, ...input, state: 'dialing', events: [{ state: 'dialing', at: now }], startedAt: now, webhookReports: 0, transcriptReports: 0 };
 	calls.set(id, call);
+
+	if (mode === 'browser') {
+		// Nothing is dialed: the call starts when the hotline page answers (startBrowserSession).
+		call.webhookToken = randomBytes(18).toString('base64url');
+		return call;
+	}
 
 	// DEMO_TARGET_NUMBER lets you force every call to your mock hotline, whatever the letter says.
 	const to = env.DEMO_TARGET_NUMBER || input.toNumber;
@@ -168,17 +208,7 @@ export async function startCall(input: CallInput): Promise<Call> {
 			agent_phone_number_id: env.ELEVENLABS_PHONE_NUMBER_ID,
 			to_number: to,
 			conversation_initiation_client_data: {
-				dynamic_variables: {
-					call_id: id,
-					user_name: env.USER_DISPLAY_NAME,
-					sender_name: input.senderName,
-					purpose: input.purpose,
-					reference: input.reference || 'keine Angabe',
-					letter_date: input.letterDate ?? '',
-					// The report_status tool sends this as its x-webhook-secret header.
-					// secret__ variables are never shown to the LLM.
-					secret__webhook_secret: env.WEBHOOK_SECRET || 'not-set'
-				},
+				dynamic_variables: dynamicVariables(call, env.WEBHOOK_SECRET || 'not-set'),
 				// Authorities answer in German; the agent's language detection can still switch.
 				...(language ? { conversation_config_override: { agent: { language } } } : {})
 			}
@@ -195,6 +225,51 @@ export async function startCall(input: CallInput): Promise<Call> {
 	}
 	return call;
 }
+
+// ---------- Browser hotline (CALL_MODE=browser) ----------
+
+export class CallStateError extends Error {}
+
+function browserCall(id: string): Call {
+	const call = calls.get(id);
+	if (!call) throw new CallStateError('Unknown call');
+	if (call.mode !== 'browser') throw new CallStateError('This call goes over the phone, not the browser hotline');
+	if (isTerminal(call.state)) throw new CallStateError('This call has already ended');
+	return call;
+}
+
+/** Who the hotline page plays and who it introduces, before anyone answers. */
+export function hotlineInfo(id: string) {
+	const call = browserCall(id);
+	if (call.conversationId) throw new CallStateError('The hotline has already answered this call');
+	return { senderName: call.senderName, userName: env.USER_DISPLAY_NAME };
+}
+
+/** What the hotline page needs to run the agent over WebRTC: a short-lived token and the call's variables. */
+export async function startBrowserSession(id: string) {
+	const call = browserCall(id);
+	if (call.conversationId) throw new CallStateError('The hotline has already answered this call');
+	const { token } = await getConversationToken(env.ELEVENLABS_AGENT_ID);
+	return { conversationToken: token, dynamicVariables: dynamicVariables(call, call.webhookToken!), senderName: call.senderName, userName: env.USER_DISPLAY_NAME };
+}
+
+/** The hotline page connected: follow the conversation like a phone call. */
+export function attachConversation(id: string, conversationId: string) {
+	const call = browserCall(id);
+	if (call.conversationId) return call.conversationId === conversationId;
+	call.conversationId = conversationId;
+	trackConversation(call);
+	return true;
+}
+
+/** There is no phone line to transfer, so the hotline page ends the agent and the two people talk in person. */
+export function handOver(id: string) {
+	const call = browserCall(id);
+	pushState(id, 'transferring');
+	pushState(id, 'connected', `Handed over to ${env.USER_DISPLAY_NAME} (browser demo)`);
+	return call;
+}
+
 
 // ---------- Conversation tracking ----------
 
@@ -237,6 +312,11 @@ export async function cancelCall(id: string): Promise<{ ok: boolean; error?: str
 	const call = calls.get(id);
 	if (!call) return { ok: false, error: 'Unknown call' };
 	if (isTerminal(call.state)) return { ok: true };
+	// The hotline page sees "ended" and leaves the conversation.
+	if (call.mode === 'browser') {
+		pushState(id, 'ended', 'Cancelled by user');
+		return { ok: true };
+	}
 	const sid = env.TWILIO_ACCOUNT_SID;
 	if (!sid || !env.TWILIO_AUTH_TOKEN) return { ok: false, error: 'Set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN in .env to hang up from the app' };
 	if (!call.callSid) return { ok: false, error: 'The call has not reached Twilio yet, try again in a moment' };

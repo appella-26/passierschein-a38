@@ -68,6 +68,9 @@ one-time setup. Create the board with `REPO=owner/repo PROJECT="..." A=.. B=.. C
 | `POST /api/calls` `{toNumber, senderName, purpose, reference, letterDate?}` | Start queue-waiting call (503 if ElevenLabs isn't configured) |
 | `GET /api/calls/:id/events` | SSE status timeline |
 | `POST /api/calls/:id/cancel` | Hang up via Twilio → `{ok, error?}` |
+| `POST /api/calls/:id/session` | Browser hotline: WebRTC token + call variables for `/hotline/:id` |
+| `POST /api/calls/:id/conversation` `{conversationId}` | Browser hotline: start following the conversation |
+| `POST /api/calls/:id/handover` | Browser hotline: the agent introduced the user and left |
 | `POST /api/agent/status` | Webhook for the agent's `report_status` tool |
 | `GET /api/agent/health` | Which parts of the phone setup are configured (no secrets) |
 | `DELETE /api/cases/:id` | Permanently delete a reviewed case and all its letters; body: `{letter_ids: string[]}` |
@@ -155,6 +158,26 @@ One-time setup:
 
 The agent ends calls after its maximum call duration (10 minutes unless you raise it in the agent
 settings), so a long real queue can run out; the demo hotline is well under that.
+
+## Demo without a phone number (browser hotline)
+
+No Twilio number yet? Leave `ELEVENLABS_PHONE_NUMBER_ID` empty (or set `CALL_MODE=browser`) and the app
+runs the same agent over the browser instead of a phone line. Nothing is dialed and there are no telephony
+costs; the conversation still counts towards your ElevenLabs agent minutes.
+
+1. `.env`: `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID`, `WEBHOOK_SECRET`, `USER_DISPLAY_NAME`.
+2. `pnpm dev`, `cloudflared tunnel --url http://localhost:5173`, `pnpm agent:sync`, and open the app
+   through the tunnel URL.
+3. Start a call from a letter as usual. The call screen shows a **demo hotline** link.
+4. Open that link on a second device (the teammate playing the Finanzamt) and tap **Answer call**.
+   Play the menu recording and hold music, then answer as a clerk. The agent stays quiet on hold,
+   introduces Kevin when a person speaks, and leaves; Kevin's screen shows each step live and the
+   "someone answered" alert. There is no phone to transfer to, so the two then talk in person.
+
+How it works: `POST /api/calls` creates the call without dialing; `/hotline/:id` fetches a short-lived
+WebRTC token from `POST /api/calls/:id/session` (the API key stays on the server), reports the conversation
+id, and calls `POST /api/calls/:id/handover` once the agent has introduced the user. Each browser call gets
+its own webhook secret, since the hotline page can see it. "End call" works without Twilio.
 
 ## Demo safety
 

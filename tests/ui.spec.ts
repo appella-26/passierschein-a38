@@ -61,6 +61,7 @@ const workflowCopy = {
     waitingTime: 'Time on hold', humanTitle: 'You’re up.', connected: 'You’re connected', voicemail: 'Voicemail reached', cancelCall: 'End call', ended: 'Call ended', failed: 'Call failed',
     taxOffice: /^Tax office/, all: /^All letters/, noResults: 'Nothing turned up.', resetFilters: 'Clear search & filters', zoomIn: 'Zoom in', connections: '2 linked letters',
     previewAnalysis: 'See how it works', demoCallState: 'Try a call status', callNotConfigured: 'The on-hold assistant isn’t set up yet.',
+    hotlineTitle: 'Demo hotline', hotlineLink: 'Demo hotline link', hotlineRinging: 'Incoming call', answerCall: 'Answer call', hotlineUnavailable: /isn’t available any more/,
     other: { button: 'Deutsch', todos: 'Ihre To-Dos', original: 'Original-Scan ansehen', page2: 'Seite 2', originalPage2: 'Original-Scan · Seite 2' }
   },
   de: {
@@ -70,6 +71,7 @@ const workflowCopy = {
     waitingTime: 'Zeit in der Warteschleife', humanTitle: 'Jemand ist für Sie da.', connected: 'Sie sind verbunden', voicemail: 'Anrufbeantworter erreicht', cancelCall: 'Anruf beenden', ended: 'Anruf beendet', failed: 'Anruf fehlgeschlagen',
     taxOffice: /^Finanzamt/, all: /^Alle/, noResults: 'Keine Briefe gefunden', resetFilters: 'Filter zurücksetzen', zoomIn: 'Vergrößern', connections: '2 verknüpfte Briefe',
     previewAnalysis: 'Analyse-Vorschau', demoCallState: 'Demo-Anrufstatus', callNotConfigured: 'Der Telefon-Assistent ist noch nicht eingerichtet.',
+    hotlineTitle: 'Demo-Hotline', hotlineLink: 'Link der Demo-Hotline', hotlineRinging: 'Eingehender Anruf', answerCall: 'Anruf annehmen', hotlineUnavailable: /nicht mehr verfügbar/,
     other: { button: 'English', todos: 'Your next steps', original: 'See the original', page2: 'Page 2', originalPage2: 'Original letter · Page 2' }
   }
 } as const;
@@ -175,6 +177,32 @@ test('call confirmation sends only reviewed metadata and requires consent', asyn
   await expect(page.getByRole('heading', { name: sample.sender_name })).toBeVisible();
 });
 
+test('a browser-mode call shows the demo hotline link', async ({ page }) => {
+  await mockApi(page, lang);
+  await page.route('**/api/calls', route => route.fulfill({ json: { id: 'test-call', state: 'dialing', mode: 'browser' } }));
+  await page.route('**/api/calls/test-call/events', route => route.fulfill({ contentType: 'text/event-stream', body: `data: ${JSON.stringify({ state: 'dialing', at: new Date().toISOString() })}\n\n` }));
+  await page.goto(`/letters/${sample.id}`);
+  await page.getByRole('button', { name: ui.waitForMe, exact: true }).click();
+  const sheet = page.getByRole('dialog');
+  await sheet.getByLabel(ui.phone, { exact: true }).fill('0621 / 292-0');
+  await sheet.getByRole('checkbox').check();
+  await sheet.getByRole('button', { name: ui.startCall, exact: true }).click();
+  await expect(page).toHaveURL('/calls/test-call');
+  await expect(page.getByRole('heading', { name: ui.hotlineTitle })).toBeVisible();
+  await expect(page.getByLabel(ui.hotlineLink)).toHaveValue(/\/hotline\/test-call$/);
+});
+
+test('the demo hotline names the caller, and explains when its call is gone', async ({ page }) => {
+  await page.route('**/api/calls/live-call/session', route => route.fulfill({ json: { senderName: 'Finanzamt Mannheim-Stadt', userName: 'Kevin' } }));
+  await page.goto('/hotline/live-call');
+  await expect(page.getByRole('heading', { name: ui.hotlineRinging })).toBeVisible();
+  await expect(page.getByRole('button', { name: ui.answerCall, exact: true })).toBeEnabled();
+  await expect(page.getByText('Finanzamt Mannheim-Stadt, Müller')).toBeVisible();
+  await page.route('**/api/calls/old-call/session', route => route.fulfill({ status: 409, json: { message: 'This call has already ended' } }));
+  await page.goto('/hotline/old-call');
+  await expect(page.getByRole('heading', { name: ui.hotlineUnavailable })).toBeVisible();
+});
+
 test('call confirmation explains when the phone assistant is not set up', async ({ page }) => {
   await mockApi(page, lang);
   await page.route('**/api/calls', route => route.fulfill({ status: 503, json: { message: 'ElevenLabs is not configured.', missing: ['ELEVENLABS_PHONE_NUMBER_ID'] } }));
@@ -210,6 +238,8 @@ test('all live call states render and cancellation uses the endpoint', async ({ 
   await page.waitForFunction(() => typeof (window as unknown as { emitCall: unknown }).emitCall === 'function');
   async function emit(state: string) { await page.evaluate(value => (window as unknown as { emitCall: (s: string) => void }).emitCall(value), state); }
   await expect(page.getByRole('status').filter({ hasText: ui.dialing })).toBeVisible();
+  // "Dialling" is also the state before any event arrives: wait for the replayed history, so it can't land after the next event.
+  await expect(page.getByRole('listitem').filter({ hasText: ui.dialing })).toBeVisible();
   await emit('ivr');
   await expect(page.getByRole('status').filter({ hasText: ui.ivr })).toBeVisible();
   await emit('on_hold');
@@ -232,6 +262,7 @@ test('all live call states render and cancellation uses the endpoint', async ({ 
   await page.reload();
   await page.waitForFunction(() => typeof (window as unknown as { emitCall: unknown }).emitCall === 'function');
   await expect(page.getByRole('status').filter({ hasText: ui.dialing })).toBeVisible();
+  await expect(page.getByRole('listitem').filter({ hasText: ui.dialing })).toBeVisible();
   await emit('failed');
   await expect(page.getByRole('heading', { name: ui.failed })).toBeVisible();
 });

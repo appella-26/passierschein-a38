@@ -9,6 +9,8 @@ export interface CallContext {
   reference: string;
   letterId: string;
   demo?: boolean;
+  /** "browser": no phone line, a second device answers at /hotline/<id> */
+  mode?: 'phone' | 'browser';
 }
 export const callSession = $state({
   context: null as CallContext | null,
@@ -33,7 +35,7 @@ export function restoreCallContext(demo = false) {
   callSession.context = null;
   try {
     const value = JSON.parse(sessionStorage.getItem(demo ? 'appella.demo.call' : 'appella.call') ?? 'null');
-    if (value && ['id', 'senderName', 'toNumber', 'purpose', 'reference', 'letterId'].every(key => typeof value[key] === 'string') && (value.demo === undefined || typeof value.demo === 'boolean') && !!value.demo === demo) callSession.context = value;
+    if (value && ['id', 'senderName', 'toNumber', 'purpose', 'reference', 'letterId'].every(key => typeof value[key] === 'string') && (value.demo === undefined || typeof value.demo === 'boolean') && !!value.demo === demo && (value.mode === undefined || value.mode === 'phone' || value.mode === 'browser')) callSession.context = value;
   } catch { /* SSE remains usable even without metadata. */ }
 }
 
