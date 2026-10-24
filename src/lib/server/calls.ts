@@ -6,11 +6,14 @@
 //  1. the agent's report_status tool (webhook → reportState), live, for menu / hold / human / voicemail;
 //  2. polling the ElevenLabs conversation (trackConversation), for what the agent can't report:
 //     transfer completed, call ended, busy / no answer — and as a backup if the webhook is unreachable.
+// Webhooks are fast but can arrive late or out of order; the transcript is complete and ordered but
+// polled. They are matched by order: the n-th webhook report is the n-th report_status call in the
+// transcript, so neither source replays what the other has already shown.
 
 import * as env from '$app/env/private';
 import { randomUUID } from 'node:crypto';
 import { getConversation, startOutboundCall } from '#lib/server/elevenlabs.ts';
-import { isFinished, milestones, progressRank, terminalStates, type Milestone } from '#lib/server/call-progress.ts';
+import { isFinished, readProgress, terminalStates, type Progress } from '#lib/server/call-progress.ts';
 
 export type CallState =
 	| 'dialing'
@@ -44,8 +47,10 @@ export interface Call extends CallInput {
 	state: CallState;
 	events: CallEvent[];
 	startedAt: string;
-	/** Highest progressRank reached; inferred milestones never go below it. */
-	progress: number;
+	/** report_status webhooks received for this call */
+	webhookReports: number;
+	/** report_status calls seen in the transcript so far */
+	transcriptReports: number;
 	poll?: ReturnType<typeof setTimeout>;
 }
 
@@ -79,7 +84,6 @@ export function pushState(id: string, state: CallState, note?: string, at?: stri
 	const last = call.events.at(-1)?.at ?? call.startedAt;
 	const ev: CallEvent = { state, note, at: at && at > last && at < now ? at : now };
 	call.state = state;
-	call.progress = Math.max(call.progress, progressRank[state]);
 	call.events.push(ev);
 	listeners.get(id)?.forEach((fn) => fn(ev));
 	if (isTerminal(state)) clearTimeout(call.poll);
@@ -90,14 +94,42 @@ export function pushState(id: string, state: CallState, note?: string, at?: stri
 export function reportState(id: string, state: CallState, note?: string) {
 	const call = calls.get(id);
 	if (!call) return false;
-	// After a transfer the agent has left the call, so a late webhook must not pull the UI back.
+	call.webhookReports++;
+	// The transcript already showed this report, so the poller has applied it or something newer:
+	// it arrived late and must not pull the screen back.
+	if (call.webhookReports <= call.transcriptReports) return true;
+	// After a transfer the agent has left the call, so nothing it reported before still applies.
 	if (call.state === 'connected') return true;
 	return pushState(id, state, note);
 }
 
-/** A state read from the conversation: only applied if it moves the call forward. */
-function advance(call: Call, milestone: Milestone) {
-	if (progressRank[milestone.state] > call.progress) pushState(call.id, milestone.state, milestone.note, milestone.at);
+/** Brings a call up to date with its transcript without repeating what the webhook already delivered. */
+function applyProgress(call: Call, { steps, reports, ending }: Progress, applied: Set<string>) {
+	// Steps up to the last report the webhook delivered are already on screen, or superseded by it.
+	let covered = -1;
+	if (call.webhookReports > 0) {
+		covered = steps.length - 1; // the webhooks are ahead of the transcript: all of it is older
+		let count = 0;
+		for (const [index, step] of steps.entries()) {
+			if (step.report && ++count === call.webhookReports) {
+				covered = index;
+				break;
+			}
+		}
+	}
+	for (const [index, step] of steps.entries()) {
+		if (applied.has(step.key)) continue;
+		applied.add(step.key);
+		if (index > covered) pushState(call.id, step.state, step.note, step.at);
+	}
+	call.transcriptReports = Math.max(call.transcriptReports, reports);
+
+	// Once the transcript holds every report the webhook delivered, its latest step is the current
+	// state. That corrects webhooks that arrived late or out of order.
+	const latest = steps.at(-1);
+	if (latest && call.webhookReports <= reports && call.state !== 'connected') pushState(call.id, latest.state, latest.note);
+
+	for (const { state, note } of ending) pushState(call.id, state, note);
 }
 
 // ---------- Configuration ----------
@@ -123,7 +155,7 @@ export async function startCall(input: CallInput): Promise<Call> {
 
 	const id = randomUUID().slice(0, 8);
 	const now = new Date().toISOString();
-	const call: Call = { id, ...input, state: 'dialing', events: [{ state: 'dialing', at: now }], startedAt: now, progress: 0 };
+	const call: Call = { id, ...input, state: 'dialing', events: [{ state: 'dialing', at: now }], startedAt: now, webhookReports: 0, transcriptReports: 0 };
 	calls.set(id, call);
 
 	// DEMO_TARGET_NUMBER lets you force every call to your mock hotline, whatever the letter says.
@@ -181,11 +213,7 @@ function trackConversation(call: Call) {
 			const conversation = await getConversation(conversationId);
 			failures = 0;
 			call.callSid ??= conversation.metadata?.phone_call?.call_sid;
-			for (const milestone of milestones(conversation)) {
-				if (applied.has(milestone.key)) continue;
-				applied.add(milestone.key);
-				advance(call, milestone);
-			}
+			applyProgress(call, readProgress(conversation), applied);
 			if (isFinished(conversation)) return;
 		} catch (err) {
 			failures++;
@@ -200,6 +228,10 @@ function trackConversation(call: Call) {
 
 // ---------- Hang up ----------
 
+const twilioEnded = ['completed', 'canceled', 'busy', 'no-answer', 'failed'];
+/** Twilio ends a queued or ringing call with "canceled" and a call in progress with "completed". */
+const hangUpWith = (status: string) => (status === 'queued' || status === 'ringing' ? 'canceled' : 'completed');
+
 /** Hang up via Twilio (the user pressed "cancel"). */
 export async function cancelCall(id: string): Promise<{ ok: boolean; error?: string }> {
 	const call = calls.get(id);
@@ -211,22 +243,32 @@ export async function cancelCall(id: string): Promise<{ ok: boolean; error?: str
 
 	const url = `${env.TWILIO_API_URL.replace(/\/+$/, '')}/2010-04-01/Accounts/${encodeURIComponent(sid)}/Calls/${encodeURIComponent(call.callSid)}.json`;
 	const auth = Buffer.from(`${sid}:${env.TWILIO_AUTH_TOKEN}`).toString('base64');
-	const update = async (status: 'completed' | 'canceled') => {
+	/** Reads the call, or with `status` asks Twilio to end it; returns Twilio's call status. */
+	const twilio = async (status?: 'completed' | 'canceled') => {
 		const res = await fetch(url, {
-			method: 'POST',
-			headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-			body: new URLSearchParams({ Status: status }),
+			method: status ? 'POST' : 'GET',
+			headers: { Authorization: `Basic ${auth}`, ...(status ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}) },
+			body: status ? new URLSearchParams({ Status: status }) : undefined,
 			signal: AbortSignal.timeout(15_000)
 		});
 		const data = (await res.json().catch(() => null)) as { status?: string; message?: string } | null;
 		if (!res.ok) throw new Error(data?.message ?? `Twilio ${res.status}`);
-		return data?.status;
+		return data?.status ?? '';
 	};
 
 	try {
-		// "completed" ends a call in progress; a call that is still queued or ringing needs "canceled".
-		const status = await update('completed');
-		if (status === 'queued' || status === 'ringing') await update('canceled');
+		let status = await twilio();
+		// The call can change state between reading and updating it (answered while we cancel).
+		// If Twilio rejects the update or leaves the call running, read it again and retry once.
+		for (let attempt = 0; !twilioEnded.includes(status); attempt++) {
+			try {
+				status = await twilio(hangUpWith(status));
+			} catch (err) {
+				if (attempt > 0) throw err;
+				status = await twilio();
+			}
+			if (attempt > 0 && !twilioEnded.includes(status)) throw new Error(`Twilio still reports the call as ${status}`);
+		}
 	} catch (err) {
 		console.warn(`[call ${id}] hang-up failed: ${message(err)}`);
 		return { ok: false, error: message(err) };

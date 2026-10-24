@@ -67,6 +67,8 @@ export interface ToolCall {
 	request_id: string;
 	tool_name: string;
 	params_as_json?: string;
+	/** false when the model asked for the tool but the platform never executed it */
+	tool_has_been_called?: boolean;
 }
 
 export interface ToolResult {
@@ -74,6 +76,7 @@ export interface ToolResult {
 	tool_name: string;
 	result_value?: string;
 	is_error?: boolean;
+	tool_has_been_called?: boolean;
 	result?: Record<string, unknown> | null;
 }
 

@@ -9,14 +9,35 @@ const SECRET = 'test-secret';
 type Json = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
 const outbound: Json[] = [];
-const hangups: { path: string; body: string }[] = [];
+const hangups: { sid: string; status: string }[] = [];
 const conversations = new Map<string, Json>();
 const conversationOf = new Map<string, string>(); // call id -> conversation id
+const twilioCalls = new Map<string, { status: string; answerOnCancel?: boolean }>(); // call SID -> Twilio state
 let server: Server | undefined;
 let wiredToMock = false;
 
 function send(res: ServerResponse, status: number, body: unknown) {
 	res.writeHead(status, { 'Content-Type': 'application/json' }).end(JSON.stringify(body));
+}
+
+/** Twilio's Calls API: "completed" ends a call in progress, "canceled" one that is queued or ringing. */
+function twilio(sid: string, method: string, body: string, res: ServerResponse) {
+	const call = twilioCalls.get(sid);
+	if (!call) return send(res, 404, { code: 20404, message: 'The requested resource was not found' });
+	if (method === 'GET') return send(res, 200, { sid, status: call.status });
+	const status = new URLSearchParams(body).get('Status') ?? '';
+	hangups.push({ sid, status });
+	const invalid = () => send(res, 400, { code: 21220, message: 'Invalid call state for this action' });
+	if (status === 'canceled' && call.answerOnCancel) {
+		// The callee picked up a moment before the cancel arrived.
+		call.answerOnCancel = false;
+		call.status = 'in-progress';
+		return invalid();
+	}
+	if (status === 'completed' && call.status !== 'in-progress') return invalid();
+	if (status === 'canceled' && !['queued', 'ringing'].includes(call.status)) return invalid();
+	call.status = status;
+	return send(res, 200, { sid, status });
 }
 
 test.describe.configure({ mode: 'serial' });
@@ -40,6 +61,7 @@ test.beforeAll(async () => {
 				const id = `conv_${++next}`;
 				conversationOf.set(data.conversation_initiation_client_data.dynamic_variables.call_id, id);
 				conversations.set(id, { conversation_id: id, status: 'initiated', transcript: [], metadata: { start_time_unix_secs: Math.floor(Date.now() / 1000) - 120 } });
+				twilioCalls.set(`CA_${next}`, { status: 'in-progress' });
 				return send(res, 200, { success: true, message: 'Success', conversation_id: id, callSid: `CA_${next}` });
 			}
 			const conversation = url.pathname.match(/^\/v1\/convai\/conversations\/([^/]+)$/);
@@ -47,10 +69,8 @@ test.beforeAll(async () => {
 				const found = conversations.get(conversation[1]);
 				return found ? send(res, 200, found) : send(res, 404, { detail: 'Conversation not found' });
 			}
-			if (req.method === 'POST' && url.pathname.startsWith('/2010-04-01/Accounts/AC_test/Calls/')) {
-				hangups.push({ path: url.pathname, body });
-				return send(res, 200, { status: 'completed' });
-			}
+			const call = url.pathname.match(/^\/2010-04-01\/Accounts\/AC_test\/Calls\/([^/]+)\.json$/);
+			if (call) return twilio(call[1], req.method ?? 'GET', body, res);
 			send(res, 404, { detail: `Unexpected ${req.method} ${url.pathname}` });
 		});
 	});
@@ -75,7 +95,8 @@ async function startCall(request: APIRequestContext, toNumber = '+4930123456') {
 	expect(res.status()).toBe(200);
 	const { id, state } = await res.json();
 	expect(state).toBe('dialing');
-	return { id: id as string, conversation: conversations.get(conversationOf.get(id)!)! };
+	const conversationId = conversationOf.get(id)!;
+	return { id: id as string, conversation: conversations.get(conversationId)!, twilio: twilioCalls.get(`CA_${conversationId.slice(5)}`)! };
 }
 
 const report = (request: APIRequestContext, call_id: string, state: string, note?: string, secret = SECRET) =>
@@ -106,14 +127,19 @@ async function timeline(id: string, done: (states: string[]) => boolean, timeout
 	}
 	return events;
 }
+const states = (events: Json[]) => events.map((event) => event.state);
+const settle = () => new Promise((resolve) => setTimeout(resolve, 800)); // a few poll intervals
 
-const agentTurn = (seconds: number, tool_name: string, params: Json, result?: Json) => ({
+/** One agent tool call as it appears in the transcript; pass `result` once the tool has returned. */
+const toolTurn = (seconds: number, tool_name: string, params: Json, result?: Json, called = true) => ({
 	role: 'agent',
 	time_in_call_secs: seconds,
 	message: null,
-	tool_calls: [{ request_id: `${tool_name}-${seconds}`, tool_name, params_as_json: JSON.stringify(params) }],
-	tool_results: result ? [{ request_id: `${tool_name}-${seconds}`, tool_name, type: 'system', ...result }] : []
+	tool_calls: [{ request_id: `${tool_name}-${seconds}`, tool_name, params_as_json: JSON.stringify(params), tool_has_been_called: called }],
+	tool_results: result ? [{ request_id: `${tool_name}-${seconds}`, tool_name, type: 'system', tool_has_been_called: called, ...result }] : []
 });
+const statusTurn = (seconds: number, state: string, note?: string) => toolTurn(seconds, 'report_status', { state, note }, { type: 'webhook', is_error: false });
+const transferred = { is_error: false, result: { result_type: 'transfer_to_number_twilio_success', status: 'success' } };
 
 test('starts the outbound call with the dynamic variables the agent expects', async ({ request }) => {
 	const { id } = await startCall(request);
@@ -141,71 +167,138 @@ test('the status webhook checks the secret, the state and the call', async ({ re
 	expect((await report(request, id, 'dancing')).status()).toBe(400);
 	expect((await report(request, 'nope', 'on_hold')).status()).toBe(404);
 	expect((await report(request, id, 'On Hold')).status()).toBe(200);
-	expect((await timeline(id, (states) => states.includes('on_hold'))).map((event) => event.state)).toEqual(['dialing', 'on_hold']);
+	expect(states(await timeline(id, (seen) => seen.includes('on_hold')))).toEqual(['dialing', 'on_hold']);
 });
 
-test('menu, hold, human, then transfer ends as "connected"', async ({ request }) => {
+test('menu, hold, human, then a confirmed transfer ends as "connected"', async ({ request }) => {
 	const { id, conversation } = await startCall(request);
 	conversation.status = 'in-progress';
 	for (const [state, note] of [['ivr'], ['on_hold'], ['on_hold'], ['human_detected', 'Frau Müller, Veranlagung']] as const) {
 		expect((await report(request, id, state, note)).status()).toBe(200);
 	}
-	conversation.transcript = [agentTurn(95, 'transfer_to_number', { transfer_number: '+49151000000' }, { is_error: false, result: { result_type: 'transfer_to_number_twilio_success', status: 'success' } })];
+	conversation.transcript = [
+		statusTurn(3, 'ivr'),
+		statusTurn(20, 'on_hold'),
+		statusTurn(50, 'on_hold'),
+		statusTurn(90, 'human_detected', 'Frau Müller, Veranlagung'),
+		toolTurn(95, 'transfer_to_number', { transfer_number: '+49151000000' }, transferred)
+	];
 	conversation.status = 'done';
-	const events = await timeline(id, (states) => states.includes('connected'));
-	expect(events.map((event) => event.state)).toEqual(['dialing', 'ivr', 'on_hold', 'human_detected', 'transferring', 'connected']);
+	const events = await timeline(id, (seen) => seen.includes('connected'));
+	expect(states(events)).toEqual(['dialing', 'ivr', 'on_hold', 'human_detected', 'transferring', 'connected']);
 	expect(events[3].note).toBe('Frau Müller, Veranlagung');
 	// A late webhook must not pull the screen back from "connected".
 	expect((await report(request, id, 'on_hold')).status()).toBe(200);
-	expect((await timeline(id, () => false, 1000)).at(-1)?.state).toBe('connected');
+	expect(states(await timeline(id, () => false, 1000)).at(-1)).toBe('connected');
+});
+
+test('a transfer that never ran is not "connected", and the provider failure is kept', async ({ request }) => {
+	const { id, conversation } = await startCall(request);
+	await report(request, id, 'human_detected');
+	conversation.transcript = [statusTurn(60, 'human_detected'), toolTurn(62, 'transfer_to_number', { transfer_number: '+49151000000' }, undefined, false)];
+	conversation.status = 'failed';
+	conversation.metadata.error = { code: 1011, reason: 'Telephony provider error' };
+	const events = await timeline(id, (seen) => seen.includes('failed'));
+	expect(events.map((event) => [event.state, event.note])).toEqual([['dialing', undefined], ['human_detected', undefined], ['failed', 'Telephony provider error']]);
+});
+
+test('a transfer without a confirmed result ends as "ended", not "connected"', async ({ request }) => {
+	const { id, conversation } = await startCall(request);
+	await report(request, id, 'human_detected');
+	conversation.transcript = [statusTurn(60, 'human_detected'), toolTurn(62, 'transfer_to_number', { transfer_number: '+49151000000' })];
+	conversation.status = 'done';
+	expect(states(await timeline(id, (seen) => seen.includes('ended')))).toEqual(['dialing', 'human_detected', 'transferring', 'ended']);
+});
+
+test('a failed transfer does not show "connected"', async ({ request }) => {
+	const { id, conversation } = await startCall(request);
+	await report(request, id, 'human_detected');
+	conversation.transcript = [
+		statusTurn(60, 'human_detected'),
+		toolTurn(62, 'transfer_to_number', { transfer_number: '+49151000000' }, { is_error: true, result: { result_type: 'transfer_to_number_error', status: 'error' } })
+	];
+	conversation.status = 'done';
+	expect(states(await timeline(id, (seen) => seen.includes('ended')))).toEqual(['dialing', 'human_detected', 'ended']);
 });
 
 test('a busy line fails the call with a reason', async ({ request }) => {
 	const { id, conversation } = await startCall(request);
 	conversation.status = 'done';
 	conversation.metadata.phone_call = { type: 'twilio', call_sid: 'CA_busy', call_result: 'busy' };
-	const events = await timeline(id, (states) => states.includes('failed'));
+	const events = await timeline(id, (seen) => seen.includes('failed'));
 	expect(events.map((event) => [event.state, event.note])).toEqual([['dialing', undefined], ['failed', 'Line busy']]);
 });
 
 test('voicemail detection ends the call', async ({ request }) => {
 	const { id, conversation } = await startCall(request);
-	conversation.transcript = [agentTurn(4, 'voicemail_detection', { reason: 'Außerhalb der Servicezeiten' }, { is_error: false })];
+	conversation.transcript = [toolTurn(4, 'voicemail_detection', { reason: 'Außerhalb der Servicezeiten' }, { is_error: false })];
 	conversation.status = 'done';
 	conversation.metadata.termination_reason = 'Voicemail detected';
-	const events = await timeline(id, (states) => states.includes('ended'));
-	expect(events.map((event) => event.state)).toEqual(['dialing', 'voicemail', 'ended']);
+	expect(states(await timeline(id, (seen) => seen.includes('ended')))).toEqual(['dialing', 'voicemail', 'ended']);
 });
 
 test('the transcript fills in steps when the webhook never arrives', async ({ request }) => {
 	const { id, conversation } = await startCall(request);
 	conversation.status = 'in-progress';
-	conversation.transcript = [agentTurn(3, 'report_status', { state: 'ivr' }), agentTurn(20, 'report_status', { state: 'on_hold' })];
-	expect((await timeline(id, (states) => states.includes('on_hold'))).map((event) => event.state)).toEqual(['dialing', 'ivr', 'on_hold']);
-	conversation.transcript.push(agentTurn(300, 'end_call', { reason: 'Caller hung up' }, { is_error: false }));
+	conversation.transcript = [statusTurn(3, 'ivr'), statusTurn(20, 'on_hold')];
+	expect(states(await timeline(id, (seen) => seen.includes('on_hold')))).toEqual(['dialing', 'ivr', 'on_hold']);
+	conversation.transcript.push(toolTurn(300, 'end_call', { reason: 'Caller hung up' }, { is_error: false }));
 	conversation.status = 'done';
 	conversation.metadata.termination_reason = 'Call ended by remote party';
-	const events = await timeline(id, (states) => states.includes('ended'));
+	const events = await timeline(id, (seen) => seen.includes('ended'));
 	expect(events.at(-1)).toMatchObject({ state: 'ended', note: 'Call ended by remote party' });
 });
 
-test('a failed transfer does not show "connected"', async ({ request }) => {
-	const { id, conversation } = await startCall(request);
-	await report(request, id, 'human_detected');
-	conversation.transcript = [agentTurn(60, 'transfer_to_number', { transfer_number: '+49151000000' }, { is_error: true, result: { result_type: 'transfer_to_number_error' } })];
-	conversation.status = 'done';
-	const events = await timeline(id, (states) => states.includes('ended'));
-	expect(events.map((event) => event.state)).toEqual(['dialing', 'human_detected', 'ended']);
-});
-
-test('cancel hangs up through Twilio', async ({ request }) => {
+test('a late webhook cannot undo what the transcript already showed', async ({ request }) => {
 	const { id, conversation } = await startCall(request);
 	conversation.status = 'in-progress';
+	conversation.transcript = [statusTurn(20, 'on_hold'), statusTurn(90, 'human_detected', 'Herr Weber')];
+	expect(states(await timeline(id, (seen) => seen.includes('human_detected')))).toEqual(['dialing', 'on_hold', 'human_detected']);
+	// The same two reports now arrive late through the tunnel.
+	expect((await report(request, id, 'on_hold')).status()).toBe(200);
+	expect((await report(request, id, 'human_detected', 'Herr Weber')).status()).toBe(200);
+	await settle();
+	expect(states(await timeline(id, () => false, 500))).toEqual(['dialing', 'on_hold', 'human_detected']);
+});
+
+test('webhooks that arrive out of order are put right by the transcript', async ({ request }) => {
+	const { id, conversation } = await startCall(request);
+	conversation.status = 'in-progress';
+	await report(request, id, 'human_detected');
+	await report(request, id, 'on_hold'); // sent first by the agent, delivered second
+	conversation.transcript = [statusTurn(20, 'on_hold'), statusTurn(90, 'human_detected')];
+	const events = await timeline(id, (seen) => seen.at(-1) === 'human_detected' && seen.length > 3);
+	expect(states(events)).toEqual(['dialing', 'human_detected', 'on_hold', 'human_detected']);
+});
+
+test('hang-up ends a call in progress through Twilio', async ({ request }) => {
+	const { id, conversation, twilio } = await startCall(request);
+	conversation.status = 'in-progress';
 	await report(request, id, 'on_hold');
-	const res = await request.post(`/api/calls/${id}/cancel`);
-	expect(await res.json()).toEqual({ ok: true });
-	expect(hangups.at(-1)).toEqual({ path: expect.stringMatching(/\/Calls\/CA_\d+\.json$/), body: 'Status=completed' });
-	const events = await timeline(id, (states) => states.includes('ended'));
-	expect(events.at(-1)).toMatchObject({ state: 'ended', note: 'Cancelled by user' });
+	const before = hangups.length;
+	expect(await (await request.post(`/api/calls/${id}/cancel`)).json()).toEqual({ ok: true });
+	expect(hangups.slice(before).map((hangup) => hangup.status)).toEqual(['completed']);
+	expect(twilio.status).toBe('completed');
+	expect((await timeline(id, (seen) => seen.includes('ended'))).at(-1)).toMatchObject({ state: 'ended', note: 'Cancelled by user' });
 	expect(await (await request.post('/api/calls/unknown/cancel')).json()).toEqual({ ok: false, error: 'Unknown call' });
+});
+
+test('hang-up cancels a call that is still ringing', async ({ request }) => {
+	const { id, twilio } = await startCall(request);
+	twilio.status = 'ringing';
+	const before = hangups.length;
+	expect(await (await request.post(`/api/calls/${id}/cancel`)).json()).toEqual({ ok: true });
+	expect(hangups.slice(before).map((hangup) => hangup.status)).toEqual(['canceled']);
+	expect(twilio.status).toBe('canceled');
+});
+
+test('hang-up retries when the call is answered mid-cancel', async ({ request }) => {
+	const { id, twilio } = await startCall(request);
+	twilio.status = 'ringing';
+	twilio.answerOnCancel = true; // Twilio rejects "canceled" because the call was just answered
+	const before = hangups.length;
+	expect(await (await request.post(`/api/calls/${id}/cancel`)).json()).toEqual({ ok: true });
+	expect(hangups.slice(before).map((hangup) => hangup.status)).toEqual(['canceled', 'completed']);
+	expect(twilio.status).toBe('completed');
+	expect((await timeline(id, (seen) => seen.includes('ended'))).at(-1)?.state).toBe('ended');
 });
