@@ -23,7 +23,7 @@
       {#if doc.deadline}<span class="whitespace-nowrap {completed ? 'text-on-surface-variant' : 'text-error'}">{t('deadlineLabel')}: <time datetime={doc.deadline}>{formatDate(doc.deadline, true)}</time></span>{/if}
     </div>
   {/if}
-  {#if (compact && doc.deadline && !completed) || detail?.analysis.amount_due}
+  {#if (!completed || !compact) && ((compact && doc.deadline) || detail?.analysis.amount_due)}
     <div class="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 rounded-lg bg-surface-container-low px-3 py-2 text-body-sm">
       {#if compact && doc.deadline && !completed}
         <span class="inline-flex items-center gap-1.5 whitespace-nowrap text-error"><Icon name="calendar" size={16} />{deadlineLabel(doc.deadline)}</span>

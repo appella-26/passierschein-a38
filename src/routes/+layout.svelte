@@ -6,6 +6,7 @@
   import AppHeader from '#lib/components/AppHeader.svelte';
   import BottomNav from '#lib/components/BottomNav.svelte';
   import { resetDemoChecklist } from '#lib/checklist.svelte.ts';
+  import { resetDemoChats } from '#lib/chat-session.svelte.ts';
   import { callSession, restoreCallContext, selectCallMode, stopCallEvents, watchCall } from '#lib/call-session.svelte.ts';
   let { children }: { children: Snippet } = $props();
   const isLetter = $derived(page.url.pathname.startsWith('/letters/'));
@@ -15,7 +16,7 @@
   onMount(() => { initLanguage(); restoreCallContext(demo); });
   $effect(() => {
     const preview = demo;
-    untrack(() => { selectCallMode(preview); if (!preview) resetDemoChecklist(); });
+    untrack(() => { selectCallMode(preview); if (!preview) { resetDemoChecklist(); resetDemoChats(); } });
   });
   $effect(() => {
     const id = monitoredCallId;

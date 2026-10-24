@@ -1100,3 +1100,39 @@ for (const lang of ['de', 'en'] as const) {
     await expect(error).toContainText('GEMMA_PROVIDER');
   });
 }
+
+for (const lang of ['de', 'en'] as const) {
+  test(`home and archive agree on completed tasks, including Undo in ${lang}`, async ({ page }) => {
+    const docs = await mockApi(page, lang);
+    const doc = docs[0];
+    doc.analysis.amount_due = '250,00 EUR';
+    doc.analysis.action_items.forEach(action => action.done = true);
+    await page.addInitScript(value => localStorage.setItem('appella.language', value), lang);
+    await page.clock.setFixedTime(new Date('2026-10-13T10:00:00Z'));
+    await page.goto('/');
+    const card = page.locator('.letter-card').filter({ hasText: doc.document_type });
+    await expect(card).toContainText(lang === 'de' ? 'Erledigt' : 'Completed');
+    await expect(card).not.toContainText('250,00 EUR');
+    await expect(card).not.toContainText('23');
+    await expect(card.locator('.text-error')).toHaveCount(0);
+    await card.click();
+    await expect(page.getByText('250,00 EUR', { exact: true })).toBeVisible();
+    const check = page.getByRole('checkbox').first();
+    await check.click();
+    await expect(check).not.toBeChecked();
+    await navigateInApp(page, '/');
+    await expect(card).toContainText('250,00 EUR');
+    await expect(card).toContainText(lang === 'de' ? 'Noch 23 Tage' : '23 days left');
+    await navigateInApp(page, '/archive');
+    await page.getByRole('button', { name: lang === 'de' ? /^Erledigt/ : /^Completed/ }).click();
+    await expect(page.locator('.letter-card')).toHaveCount(0);
+    await navigateInApp(page, `/letters/${doc.id}`);
+    await check.click();
+    await expect(check).toBeChecked();
+    await page.getByRole('button', { name: lang === 'de' ? 'Rückgängig' : 'Undo', exact: true }).click();
+    await expect(check).not.toBeChecked();
+    await navigateInApp(page, '/');
+    await expect(card).toContainText('250,00 EUR');
+    expect(doc.analysis.amount_due).toBe('250,00 EUR');
+  });
+}

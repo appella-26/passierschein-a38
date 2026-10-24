@@ -120,6 +120,19 @@ const de = {
   connections: '{count} verknüpfte Briefe', connectionOne: '1 verknüpfter Brief', connectedDocuments: 'Verbundene Briefe', graphEmpty: 'Ihr Wissensnetz wächst mit jedem Brief.',
   graphEmptyHint: 'Erfassen Sie einen Brief, um Absender, Referenzen und Themen miteinander zu verknüpfen.',
   graphLoadError: 'Das Wissensnetz konnte nicht geladen werden.', errorTitle: 'Etwas ist schiefgelaufen',
+  chat: 'Chat', chatGreeting: 'Lass uns deine Briefe ansehen.', chatIntro: 'Frag nach Fristen, nächsten Schritten oder einem bestimmten Schreiben.',
+  chatInput: 'Nachricht', chatPlaceholder: 'Frag nach deinen Briefen…', chatSend: 'Nachricht senden', chatStop: 'Antwort stoppen', chatNew: 'Neuer Chat',
+  chatConversation: 'Unterhaltung', chatYou: 'Du', chatAssistant: 'Appella', chatAbout: 'Zu', chatAllLetters: 'Über alle Briefe sprechen',
+  chatAskLetter: 'Zu diesem Brief fragen', chatAskCase: 'Zu dieser Akte fragen', chatSuggestLetter: 'Was muss ich bei diesem Brief tun?',
+  chatSuggestDeadlines: 'Was braucht meine Aufmerksamkeit?', chatSuggestConnections: 'Welche Briefe gehören zusammen?',
+  chatThinking: 'Appella denkt nach…', chatSearching: 'Briefe werden geprüft…', chatUpdating: 'Änderung wird gespeichert…',
+  chatReplyFailed: 'Die Antwort konnte nicht abgeschlossen werden. Bereits gespeicherte Änderungen bleiben unten verfügbar.',
+  chatReplyInterrupted: 'Die Verbindung wurde unterbrochen. Die bisherige Antwort und Änderungen bleiben erhalten.',
+  chatStopped: 'Antwort gestoppt. Bereits gespeicherte Änderungen bleiben bestehen.', chatToolFailed: 'Ein Schritt konnte nicht abgeschlossen werden.',
+  chatUndone: 'Rückgängig gemacht', chatUndoFailed: 'Rückgängig konnte nicht bestätigt werden. Prüfe die Akte vor einem erneuten Versuch.',
+  chatOpenLetter: 'Brief öffnen', chatOpenCase: 'Akte ansehen', chatReviewCall: 'Anruf prüfen', chatActionFailed: 'Der Brief konnte nicht geladen werden. Bitte erneut versuchen.',
+  chatCaseFailed: 'Diese Akte konnte nicht geladen werden.', chatContextFailed: 'Dieser Brief oder diese Akte ist nicht verfügbar.',
+  chatInfo: 'Über diesen Chat', chatPrivacy: 'Nachrichten und relevante Briefdetails gehen an den konfigurierten KI-Dienst. Der Chatverlauf bleibt im Browser-Speicher und wird beim Neuladen gelöscht. Ein neuer Chat macht gespeicherte Änderungen nicht rückgängig.',
   caseLabel: 'Akte', assistantError: 'Der Assistent ist gerade nicht erreichbar (Fehler {status}). Bitte erneut versuchen.'
 } as const;
 
@@ -242,6 +255,19 @@ const en: Record<keyof typeof de, string> = {
   connections: '{count} linked letters', connectionOne: '1 linked letter', connectedDocuments: 'Letters in this view', graphEmpty: 'The dots will connect.',
   graphEmptyHint: 'Add your first letter to start seeing the connections between senders, reference numbers and topics.',
   graphLoadError: 'We couldn’t load your connections. Try again.', errorTitle: 'That didn’t go to plan.',
+  chat: 'Chat', chatGreeting: 'Let’s look at your letters.', chatIntro: 'Ask about deadlines, next steps, or a particular letter.',
+  chatInput: 'Message', chatPlaceholder: 'Ask about your letters…', chatSend: 'Send message', chatStop: 'Stop response', chatNew: 'New chat',
+  chatConversation: 'Conversation', chatYou: 'You', chatAssistant: 'Appella', chatAbout: 'About', chatAllLetters: 'Chat about all letters',
+  chatAskLetter: 'Ask about this letter', chatAskCase: 'Ask about this case', chatSuggestLetter: 'What should I do about this letter?',
+  chatSuggestDeadlines: 'What needs my attention?', chatSuggestConnections: 'Which letters belong together?',
+  chatThinking: 'Appella is thinking…', chatSearching: 'Checking your letters…', chatUpdating: 'Saving the change…',
+  chatReplyFailed: 'We couldn’t finish the reply. Any saved changes remain available below.',
+  chatReplyInterrupted: 'The connection was interrupted. Your partial reply and changes are still here.',
+  chatStopped: 'Response stopped. Any saved changes are kept.', chatToolFailed: 'One step couldn’t be completed.',
+  chatUndone: 'Undone', chatUndoFailed: 'We couldn’t confirm Undo. Check the case before trying again.',
+  chatOpenLetter: 'Open letter', chatOpenCase: 'View case', chatReviewCall: 'Review call', chatActionFailed: 'We couldn’t load the letter. Try again.',
+  chatCaseFailed: 'We couldn’t load this case.', chatContextFailed: 'That letter or case is unavailable.',
+  chatInfo: 'About this chat', chatPrivacy: 'Messages and relevant letter details go to your chosen AI service. Chat history stays in browser memory and clears on reload. A new chat doesn’t undo saved changes.',
   caseLabel: 'Case', assistantError: 'We couldn’t reach the assistant (error {status}). Try again.'
 };
 

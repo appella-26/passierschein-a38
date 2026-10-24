@@ -1,3 +1,5 @@
 allowBuilds:
   better-sqlite3: true
   '@tailwindcss/oxide': true
+  '@google/genai': set this to true or false
+  protobufjs: set this to true or false

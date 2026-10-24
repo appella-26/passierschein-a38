@@ -89,7 +89,13 @@ No Ollama installation or model download is required. It supports:
 - UI events: `open_case`, `open_letter`, `prepare_call`. The last only prepares a call; it never dials.
 
 Stream events: `text`, `tool` (start/done), `refs`, `change`, `ui`, `done`, `error`.
-The backend/client helpers are available, but assistant and case pages are not added by this backend merge.
+`/assistant` provides a minimal streaming chat UI over this backend, with optional case context and a
+quiet **Ask about this letter** link from a letter. References open letters or a read-only case preview;
+there is no separate case-management screen. Explicitly requested edits show a compact Undo control.
+Call drafts use the existing review/consent sheet and never dial automatically.
+Conversation history stays in browser memory across app navigation, not in persistent browser storage,
+and clears on reload or **New chat**. Stopping or losing a reply keeps partial text and received change
+receipts; it never automatically retries an operation. DE/EN follows the selected UI language.
 The UI checklist uses server-side to-dos and offers Undo for its latest saved change. Checkmarks are
 confirmed only after a successful save; failed saves keep the previous state. Letter details are
 reloaded after edits and on navigation, so changes from other clients are not hidden by a browser cache.
@@ -167,6 +173,7 @@ design tokens are in `src/app.css`. The original Stitch references are in `desig
 - `/calls/:id`: live SSE timeline, queue timer, human-answer alert and cancellation.
 - `/archive`: bilingual search and filters, including completion from server-backed checklists.
 - `/graph`: interactive document connections, plus keyboard-accessible document links.
+- `/assistant`: chat about letters, deadlines and cases, with clickable references and Undo for edits.
 
 English is the default; an explicitly saved DE/EN preference takes priority. The toggle changes the
 interface and the language of **new** analyses. Stored letter text is not automatically
@@ -201,6 +208,8 @@ a state selector to preview every call view. Demo mode never starts a real call 
 It is disabled in production builds.
 Preview checkmarks and call metadata are isolated from normal state. Leaving `?demo=1` resets page-local
 preview state (including captures, analysis screens, search filters and graph selections).
+The chat demo uses canned replies and local-only edits/Undo; it never calls the model or phone APIs,
+and its conversation state is separate from normal chat.
 
 ### Validation
 

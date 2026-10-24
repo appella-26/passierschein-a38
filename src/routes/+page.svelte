@@ -13,6 +13,7 @@
   import Analyzing from '#lib/components/Analyzing.svelte';
   import { callSession, terminalStates } from '#lib/call-session.svelte.ts';
   import { clearUploadDraft, readUploadDraft, writeUploadDraft, type UploadDraft } from '#lib/upload-draft.ts';
+  import { isDocumentDone } from '#lib/checklist.svelte.ts';
 
   type CapturedPage = { id: number; file: File; url: string; encoded?: Promise<string> };
   let captures = $state<CapturedPage[]>([]);
@@ -231,7 +232,7 @@
       </Card>
       {#if !focusedUpload}
       <section class="space-y-3"><div class="section-heading"><h2 class="font-headline text-headline-sm text-primary">{t('recent')}</h2><a href={'/archive' + (demo ? '?demo=1' : '')} class="inline-flex min-h-11 shrink-0 items-center gap-1 whitespace-nowrap rounded-lg text-label-md text-secondary">{t('toArchive')}<Icon name="arrow" size={16} /></a></div>
-        {#if listLoading}<Card><p role="status" class="text-body-sm text-outline">{t('loading')}</p></Card>{:else if listError}<Card><p role="alert" class="mb-3 text-body-sm text-error">{t('error')}</p><Button variant="quiet" onclick={() => reload++}>{t('retry')}</Button></Card>{:else if !documents.length}<Card><Icon name="document" size={28} class="mb-3 text-outline" /><h3 class="font-headline text-headline-sm text-primary">{t('noLetters')}</h3><p class="mt-1 text-body-sm text-on-surface-variant">{t('noLettersHint')}</p></Card>{:else}{#each documents.slice(0, 3) as doc (doc.id)}<LetterCard {doc} detail={recentDetails[doc.id]} {demo} compact />{/each}<a href={'/archive' + (demo ? '?demo=1' : '')} class="flex min-h-12 items-center justify-center gap-2 rounded-xl text-label-md text-primary">{t('allLetters', { count: documents.length })}<Icon name="arrow" size={18} /></a>{/if}
+        {#if listLoading}<Card><p role="status" class="text-body-sm text-outline">{t('loading')}</p></Card>{:else if listError}<Card><p role="alert" class="mb-3 text-body-sm text-error">{t('error')}</p><Button variant="quiet" onclick={() => reload++}>{t('retry')}</Button></Card>{:else if !documents.length}<Card><Icon name="document" size={28} class="mb-3 text-outline" /><h3 class="font-headline text-headline-sm text-primary">{t('noLetters')}</h3><p class="mt-1 text-body-sm text-on-surface-variant">{t('noLettersHint')}</p></Card>{:else}{#each documents.slice(0, 3) as doc (doc.id)}<LetterCard {doc} detail={recentDetails[doc.id]} {demo} compact completed={!!recentDetails[doc.id] && isDocumentDone(recentDetails[doc.id], demo)} />{/each}<a href={'/archive' + (demo ? '?demo=1' : '')} class="flex min-h-12 items-center justify-center gap-2 rounded-xl text-label-md text-primary">{t('allLetters', { count: documents.length })}<Icon name="arrow" size={18} /></a>{/if}
       </section>
       {/if}
     </div>
