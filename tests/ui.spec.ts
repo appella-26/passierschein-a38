@@ -4,6 +4,14 @@ import { getMockDocuments, mockDocuments, mockRows, mockGraph } from '../src/lib
 const sample = mockDocuments[0];
 const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=', 'base64');
 
+/** setInputFiles before hydration fires a change event no handler hears, so retry until the page lists it. */
+async function addPage(page: Page, listed: string, name = 'sample.png') {
+  await expect(async () => {
+    await page.locator('input[type=file][multiple]').setInputFiles({ name, mimeType: 'image/png', buffer: tinyPng });
+    await expect(page.getByText(listed, { exact: true })).toBeVisible({ timeout: 1000 });
+  }).toPass();
+}
+
 async function mockApi(page: Page, lang: 'de' | 'en' = 'de') {
   await page.route('**/api/documents*', route => route.fulfill({ json: mockRows(new URL(route.request().url()).searchParams.get('q') ?? '', lang) }));
   await page.route('**/api/documents/*', route => {
@@ -57,8 +65,7 @@ test('upload resizes images, shows analysis, and navigates to a result', async (
     await route.fulfill({ json: { id: sample.id, analysis: sample.analysis, related: sample.related } });
   });
   await page.goto('/');
-  await page.locator('input[type=file][multiple]').setInputFiles({ name: 'sample.png', mimeType: 'image/png', buffer: tinyPng });
-  await expect(page.getByText(ui.pages)).toBeVisible();
+  await addPage(page, ui.pages);
   await page.getByRole('button', { name: ui.analyzeOne, exact: true }).click();
   await expect(page.getByRole('status').filter({ hasText: ui.analyzing })).toBeVisible();
   await expect.poll(() => payload?.lang).toBe(lang);
@@ -96,7 +103,7 @@ test('analysis errors retain uploads and cancelling does not navigate to a late 
   await mockApi(page, lang);
   await page.route('**/api/analyze', route => route.fulfill({ status: 502, json: { message: 'Ollama unavailable' } }));
   await page.goto('/');
-  await page.locator('input[type=file][multiple]').setInputFiles({ name: 'sample.png', mimeType: 'image/png', buffer: tinyPng });
+  await addPage(page, ui.pages);
   await page.getByRole('button', { name: ui.analyzeOne, exact: true }).click();
   await expect(page.getByRole('alert')).toContainText(ui.analysisError);
   await expect(page.getByText(ui.pages)).toBeVisible();
@@ -369,7 +376,7 @@ test('English is the first-paint default and new analyses request English', asyn
   await expect(page.getByRole('heading', { name: 'Let’s untangle this.' })).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await expect(page.getByRole('button', { name: 'English', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await page.locator('input[type=file][multiple]').setInputFiles({ name: 'letter.png', mimeType: 'image/png', buffer: tinyPng });
+  await addPage(page, 'Your pages (1)', 'letter.png');
   await page.getByRole('button', { name: 'Explain this page', exact: true }).click();
   await expect.poll(() => payload?.lang).toBe('en');
   await expect(page).toHaveURL(`/letters/${doc.id}`);
