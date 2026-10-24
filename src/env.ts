@@ -24,6 +24,10 @@ export const variables = defineEnvVars({
 	ELEVENLABS_API_KEY: { schema: optional('') },
 	ELEVENLABS_AGENT_ID: { schema: optional('') },
 	ELEVENLABS_PHONE_NUMBER_ID: { schema: optional(''), description: 'ID of the imported Twilio number in ElevenLabs' },
+	ELEVENLABS_BROWSER_AGENT_ID: {
+		schema: optional(''),
+		description: 'The separate "Appella Browser Rehearsal" agent behind /rehearsal (no phone number needed)'
+	},
 	ELEVENLABS_API_URL: {
 		schema: optional('https://api.elevenlabs.io'),
 		description: 'ElevenLabs API base URL (EU data residency: https://api.eu.residency.elevenlabs.io)'

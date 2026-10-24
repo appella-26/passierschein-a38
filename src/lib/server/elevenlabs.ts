@@ -1,5 +1,5 @@
 // src/lib/server/elevenlabs.ts
-// Minimal ElevenLabs Agents API client: start an outbound call, read a conversation.
+// Minimal ElevenLabs Agents API client: start an outbound call, mint a browser session token, read a conversation.
 
 import * as env from '$app/env/private';
 
@@ -58,6 +58,12 @@ export interface OutboundCallResponse {
 
 export const startOutboundCall = (body: OutboundCallRequest) =>
 	api<OutboundCallResponse>('/v1/convai/twilio/outbound-call', { method: 'POST', body: JSON.stringify(body) });
+
+// ---------- Browser session (WebRTC) ----------
+
+/** Short-lived token that lets a browser start one conversation with a private agent. */
+export const getConversationToken = async (agentId: string) =>
+	(await api<{ token: string }>(`/v1/convai/conversation/token?agent_id=${encodeURIComponent(agentId)}`)).token;
 
 // ---------- Conversation details ----------
 

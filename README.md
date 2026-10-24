@@ -70,6 +70,8 @@ one-time setup. Create the board with `REPO=owner/repo PROJECT="..." A=.. B=.. C
 | `POST /api/calls/:id/cancel` | Hang up via Twilio → `{ok, error?}` |
 | `POST /api/agent/status` | Webhook for the agent's `report_status` tool |
 | `GET /api/agent/health` | Which parts of the phone setup are configured (no secrets) |
+| `GET /api/rehearsal` | Whether the browser rehearsal is configured → `{ready, missing}` |
+| `POST /api/rehearsal` | Single-use WebRTC token for the rehearsal agent → `{conversationToken}` (503 if not configured) |
 | `DELETE /api/cases/:id` | Permanently delete a reviewed case and all its letters; body: `{letter_ids: string[]}` |
 
 Client helpers: `src/lib/resize.ts` downsizes photos before upload; `src/lib/assistant-client.ts`
@@ -155,6 +157,34 @@ One-time setup:
 
 The agent ends calls after its maximum call duration (10 minutes unless you raise it in the agent
 settings), so a long real queue can run out; the demo hotline is well under that.
+
+### Browser rehearsal (no phone number)
+
+`/rehearsal` runs a separate agent, **Appella Browser Rehearsal**, in the browser over WebRTC. Nobody is
+dialled and nothing is transferred, so it needs no Twilio account. One person opens Appella on a laptop and
+starts the rehearsal. A second person plays the tax office hotline out loud into that laptop's microphone,
+using the script shown on the page:
+
+1. Menu: "Willkommen beim Finanzamt. Für Fragen zu Ihrem Bescheid wählen Sie die Eins."
+2. Hold: "Bitte bleiben Sie in der Leitung.", then 10 seconds of silence.
+3. A person: "Finanzamt, Müller am Apparat, guten Tag. Wie kann ich Ihnen helfen?"
+
+The agent answers the menu out loud ("Die Eins, bitte."), stays silent on hold and reports each phase
+through its `report_browser_status` client tool. The page ticks off menu → hold → person. When a person
+answers, **Take over here** ends the AI session and you carry on talking in the room. Voicemail ends the
+rehearsal without a message. Each rehearsal is capped at 3 minutes.
+
+Setup:
+
+1. The agent is private, so the browser needs a signed token. In ElevenLabs, create a separate API key for
+   the demo that can only create conversation tokens, and give it a credit limit. Keep it out of chat and git.
+2. In `.env`, set `ELEVENLABS_API_KEY` to that key and `ELEVENLABS_BROWSER_AGENT_ID` to the agent's ID.
+   Restart `pnpm dev`. No tunnel or webhook is needed, because the agent talks to the page directly.
+3. Open `/rehearsal`, or use **Rehearse in the browser** in the call sheet, which appears once both
+   settings are in place. The browser asks for the microphone. Over plain HTTP that only works on
+   `localhost`.
+
+The server mints a single-use token (`POST /api/rehearsal`). The API key never reaches the browser.
 
 ## Demo safety
 

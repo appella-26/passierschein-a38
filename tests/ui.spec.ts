@@ -57,7 +57,7 @@ const workflowCopy = {
   en: {
     pages: 'Your pages (1)', analyzeOne: 'Explain this page', analyzing: 'Reading your letter…', analysisError: 'We couldn’t finish reading this letter.',
     cancelAnalysis: 'Back to your pages', capture: 'Your letter', completeAction: 'Mark as complete:', copyReference: 'Copy Steuernummer', copied: 'Copied. One less thing to type.',
-    waitForMe: 'Hold the line for me', startCall: 'Start the call', phone: 'Phone number', dialing: 'Dialling…', ivr: 'Working through the phone menu',
+    waitForMe: 'Hold the line for me', startCall: 'Start the call', backToLetter: 'Back to the letter', phone: 'Phone number', dialing: 'Dialling…', ivr: 'Working through the phone menu',
     waitingTime: 'Time on hold', humanTitle: 'You’re up.', connected: 'You’re connected', voicemail: 'Voicemail reached', cancelCall: 'End call', ended: 'Call ended', failed: 'Call failed',
     taxOffice: /^Tax office/, all: /^All letters/, noResults: 'Nothing turned up.', resetFilters: 'Clear search & filters', zoomIn: 'Zoom in', connections: '2 linked letters',
     previewAnalysis: 'See how it works', demoCallState: 'Try a call status', callNotConfigured: 'The on-hold assistant isn’t set up yet.',
@@ -66,7 +66,7 @@ const workflowCopy = {
   de: {
     pages: 'Erfasste Seiten (1)', analyzeOne: '1 Seite jetzt analysieren', analyzing: 'Analyse läuft', analysisError: 'Die Analyse ist fehlgeschlagen.',
     cancelAnalysis: 'Zur Erfassung zurück', capture: 'Ihr Brief', completeAction: 'Als erledigt markieren:', copyReference: 'Steuernummer kopieren', copied: 'In die Zwischenablage kopiert',
-    waitForMe: 'In der Warteschleife warten', startCall: 'Anruf starten & Warteschleife übergeben', phone: 'Rufnummer', dialing: 'Nummer wird gewählt', ivr: 'Telefonmenü wird durchlaufen',
+    waitForMe: 'In der Warteschleife warten', startCall: 'Anruf starten & Warteschleife übergeben', backToLetter: 'Zurück zum Brief', phone: 'Rufnummer', dialing: 'Nummer wird gewählt', ivr: 'Telefonmenü wird durchlaufen',
     waitingTime: 'Zeit in der Warteschleife', humanTitle: 'Jemand ist für Sie da.', connected: 'Sie sind verbunden', voicemail: 'Anrufbeantworter erreicht', cancelCall: 'Anruf beenden', ended: 'Anruf beendet', failed: 'Anruf fehlgeschlagen',
     taxOffice: /^Finanzamt/, all: /^Alle/, noResults: 'Keine Briefe gefunden', resetFilters: 'Filter zurücksetzen', zoomIn: 'Vergrößern', connections: '2 verknüpfte Briefe',
     previewAnalysis: 'Analyse-Vorschau', demoCallState: 'Demo-Anrufstatus', callNotConfigured: 'Der Telefon-Assistent ist noch nicht eingerichtet.',
@@ -186,6 +186,23 @@ test('call confirmation explains when the phone assistant is not set up', async 
   await sheet.getByRole('button', { name: ui.startCall, exact: true }).click();
   await expect(sheet.getByRole('alert')).toContainText(ui.callNotConfigured);
   await expect(page).toHaveURL(`/letters/${sample.id}`);
+});
+
+test('call confirmation offers the browser rehearsal only when it is set up', async ({ page }) => {
+  await mockApi(page, lang);
+  let ready = false;
+  await page.route('**/api/rehearsal', route => route.fulfill({ json: { ready, missing: ready ? [] : ['ELEVENLABS_BROWSER_AGENT_ID'] } }));
+  await page.goto(`/letters/${sample.id}`);
+  const open = page.getByRole('button', { name: ui.waitForMe, exact: true });
+  const sheet = page.getByRole('dialog');
+  await open.click();
+  await expect(sheet.getByRole('button', { name: ui.startCall, exact: true })).toBeVisible();
+  await expect(sheet.locator('a[href="/rehearsal"]')).toHaveCount(0);
+  await sheet.getByRole('button', { name: ui.backToLetter, exact: true }).click();
+  ready = true;
+  await open.click();
+  await sheet.locator('a[href="/rehearsal"]').click();
+  await expect(page).toHaveURL('/rehearsal');
 });
 
 test('all live call states render and cancellation uses the endpoint', async ({ page }) => {

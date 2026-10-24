@@ -2,7 +2,7 @@
   import { goto } from '$app/navigation';
   import type { ActionItem, DocumentDetail, CallState } from '#lib/types.ts';
   import { t } from '#lib/i18n.ts';
-  import { ApiError, post } from '#lib/api.ts';
+  import { ApiError, post, request } from '#lib/api.ts';
   import { phoneToE164 } from '#lib/format.ts';
   import { saveCallContext } from '#lib/call-session.svelte.ts';
   import { enableSound } from '#lib/notifications.svelte.ts';
@@ -16,9 +16,15 @@
   let consent = $state(false);
   let pending = $state(false);
   let failed = $state<'error' | 'callNotConfigured' | false>(false);
+  let rehearsal = $state(false);
   const normalized = $derived(phoneToE164(number));
   const reference = $derived(doc.analysis.references.map(item => `${item.label}: ${item.value}`).join(' · '));
   $effect(() => { if (open) { number = action.phone_raw ?? action.phone ?? ''; purpose = action.call_purpose_de ?? ''; consent = false; failed = false; } });
+  // Offer the phone-free browser rehearsal when its agent is configured (never in the demo preview).
+  $effect(() => {
+    if (!open || demo) return;
+    request<{ ready: boolean }>('/api/rehearsal', { cache: 'no-store' }).then(status => { rehearsal = status.ready; }, () => { rehearsal = false; });
+  });
 
   async function start() {
     if (!normalized || !purpose.trim() || !consent || pending) return;
@@ -61,6 +67,7 @@
     <label class="flex min-h-12 items-start gap-3 rounded-xl bg-surface-container-low p-3 text-body-sm text-primary"><input class="mt-1 size-5 shrink-0 accent-primary" type="checkbox" bind:checked={consent} required />{t('confirmConsent')}</label>
     {#if failed}<p role="alert" class="rounded-xl bg-error-container p-3 text-body-sm text-error">{t(failed)}</p>{/if}
     <Button type="submit" class="w-full" disabled={pending || !normalized || !purpose.trim() || !consent}><Icon name="phone" />{t(pending ? 'startingCall' : 'startCall')}</Button>
+    {#if rehearsal}<a href="/rehearsal" class="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-surface-container-high bg-white px-4 py-2.5 text-label-lg text-primary hover:bg-surface-container-low"><Icon name="headset" />{t('rehearsalLink')}</a>{/if}
     <Button variant="quiet" class="w-full" onclick={() => open = false} disabled={pending}>{t('backToLetter')}</Button>
   </form>
 </BottomSheet>
