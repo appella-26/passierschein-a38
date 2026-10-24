@@ -73,6 +73,7 @@ one-time setup. Create the board with `REPO=owner/repo PROJECT="..." A=.. B=.. C
 | `POST /api/calls/:id/handover` | Browser hotline: the agent introduced the user and left |
 | `POST /api/agent/status` | Webhook for the agent's `report_status` tool |
 | `GET /api/agent/health` | Which parts of the phone setup are configured (no secrets) |
+| `DELETE /api/cases/:id` | Permanently delete a reviewed case and all its letters; body: `{letter_ids: string[]}` |
 
 Client helpers: `src/lib/resize.ts` downsizes photos before upload; `src/lib/assistant-client.ts`
 streams chat and parses `[[letter:ID]]` / `[[case:ID]]` references.
@@ -91,8 +92,21 @@ No Ollama installation or model download is required. It supports:
 - UI events: `open_case`, `open_letter`, `prepare_call`. The last only prepares a call; it never dials.
 
 Stream events: `text`, `tool` (start/done), `refs`, `change`, `ui`, `done`, `error`.
-The backend/client helpers are available, but assistant and case pages are not added by this backend merge.
-The existing UI checklist stays browser-local and is not synchronized with server-side to-dos.
+`/assistant` provides a minimal streaming chat UI over this backend, with optional case context and a
+quiet **Ask about this letter** link from a letter. References open letters or a read-only case preview;
+there is no separate case-management screen. Explicitly requested edits show a compact Undo control.
+Call drafts use the existing review/consent sheet and never dial automatically.
+Conversation history stays in browser memory across app navigation, not in persistent browser storage,
+and clears on reload or **New chat**. Stopping or losing a reply keeps partial text and received change
+receipts; it never automatically retries an operation. DE/EN follows the selected UI language.
+The UI checklist uses server-side to-dos and offers Undo for its latest saved change. Checkmarks are
+confirmed only after a successful save; failed saves keep the previous state. Letter details are
+reloaded after edits and on navigation, so changes from other clients are not hidden by a browser cache.
+The quiet **Delete case…** option at the bottom of a letter opens a list of every letter in its case.
+Deletion requires explicit confirmation and cannot be undone. It removes scans, analyses, search/graph
+entries and that case's history, while preserving other cases and shared graph entities. The server rejects
+deletion if case membership changed since review. Duplicate uploads sharing a reference can belong to the
+same case, so deleting that case may remove the original as well.
 
 ```bash
 curl -N localhost:5173/api/chat -H 'content-type: application/json' \
@@ -178,10 +192,12 @@ The UI uses Svelte 5 runes and Tailwind 4. SvelteKit 3 configuration is in `vite
 design tokens are in `src/app.css`. The original Stitch references are in `design:stitch/`.
 
 - `/`: photograph or upload one or more JPEG, PNG or WebP pages, then analyze with the configured provider.
-- `/letters/:id`: summary, deadlines, copyable references, local checklist, original scans and call confirmation.
+- `/letters/:id`: summary, deadlines, copyable references and payment details, server-backed checklist with Undo, original scans and call confirmation.
 - `/calls/:id`: live SSE timeline, queue timer, human-answer alert and cancellation.
-- `/archive`: bilingual search and filters. Completed-checklist marks are browser-local, not server records.
+- `/archive`: bilingual search and filters, including completion from server-backed checklists.
 - `/graph`: interactive document connections, plus keyboard-accessible document links.
+  Disconnected groups are gently centered while keeping existing link distances and collision spacing.
+- `/assistant`: chat about letters, deadlines and cases, with clickable references and Undo for edits.
 
 English is the default; an explicitly saved DE/EN preference takes priority. The toggle changes the
 interface and the language of **new** analyses. Stored letter text is not automatically
@@ -189,6 +205,25 @@ translated. PDFs and HEIC must first be exported as images. Web fonts are fetche
 the Gemini provider, letter images and analysis data are sent to Google for the requested analysis; with
 Ollama they remain local. Sound/vibration support varies by browser, and the page must remain open for
 alerts. Returning from analysis stops the browser's wait, not necessarily the provider request.
+Double-tap zoom is disabled for the app's touch UI; pinch/browser zoom and the graph's explicit zoom controls
+remain available. Phone inputs use at least 16px text to avoid iOS focus magnification.
+Upload errors distinguish configuration, rate limits, invalid model responses and connectivity problems
+without displaying raw provider messages. Selected pages stay available for retry; `Retry-After` is shown
+when the service supplies it. Payment details must be checked against the original; Appella never initiates payment.
+Analysis failures have a safe `code` and `request_id`; server logs include the matching reference and
+numeric provider status, never raw provider bodies or letter contents. Temporary provider failures,
+configuration errors, invalid output, timeouts and storage failures are handled separately. Provider requests
+have a three-minute timeout; rate limits disable retry for the suggested wait instead of resubmitting automatically.
+
+Resized upload pages are temporarily stored in **this tab's session storage**. After an unexpected reload,
+the app restores the pages and explains that an interrupted analysis may already be in the archive. It never
+automatically sends them again. A saved-result checkpoint lets you reopen the result if navigation fails.
+The draft is cleared once that result loads successfully or you choose **Discard selected pages**; it is
+isolated from demo captures. If browser storage is unavailable or the pages exceed its quota, a visible
+warning explains that recovery is not guaranteed.
+After selecting pages, the upload view focuses on previews, **Add a page**, and one **Explain** button.
+Recent letters and the empty-upload prompt are hidden until you discard the pages. Routine privacy/recovery
+information and technical error details are collapsed; failures show a short message with the relevant action.
 
 ### Preview without Ollama or telephony
 
@@ -197,6 +232,10 @@ use `src/lib/mock/analysis.json` and its English companion `analysis.en.json`; a
 follow the selected language while keeping printed references and German call purposes intact. The demo call has
 a state selector to preview every call view. Demo mode never starts a real call or silently replaces a failed API response.
 It is disabled in production builds.
+Preview checkmarks and call metadata are isolated from normal state. Leaving `?demo=1` resets page-local
+preview state (including captures, analysis screens, search filters and graph selections).
+The chat demo uses canned replies and local-only edits/Undo; it never calls the model or phone APIs,
+and its conversation state is separate from normal chat.
 
 ### Validation
 
@@ -206,16 +245,23 @@ pnpm build
 pnpm exec playwright install chromium --only-shell  # once, for browser tests
 pnpm test
 node scripts/check-backend.mjs                     # isolated fresh DB + mocked providers, no network
+# Optional regression while the normal dev server is running (reads documents only):
+APPELLA_LIVE_URL=http://localhost:5173 node scripts/check-backend.mjs
 ```
 
 Browser tests mock the APIs, so they don't need Gemini or Ollama and cannot dial a real number. They cover upload,
-language persistence, reference copying, checklists, confirmation, call states, search and graph navigation,
+language persistence, reference/payment copying, checklist saves/failures/Undo, demo-to-normal navigation,
+localized upload errors, confirmation, call states, search and graph navigation,
 and capture screenshots at 390px and laptop widths in the gitignored `test-results/` directory.
+Backend checks use separate generated SvelteKit configuration and Vite caches in their own temporary
+directory; they never rewrite the running app's generated environment or use its database.
 
 `tests/agent-api.spec.ts` runs the server side of a call (outbound call, status webhook, transfer, voicemail,
 busy line, hang-up) against a fake ElevenLabs and Twilio API on port 5199; `playwright.config.ts` points the
 dev server there, overriding `.env`. If a `pnpm dev` with your real keys is already running, Playwright reuses
 it and these tests skip themselves instead of calling ElevenLabs.
+When Playwright starts its own server, generated configuration and Vite caches go into
+`.svelte-kit/playwright/`, so mock phone credentials do not overwrite a separate running dev server's environment.
 
 For just the next batch of GitHub issues, use `ONLY_ROUND2=1` with `scripts/create-issues.sh`.
 The script is not run automatically.

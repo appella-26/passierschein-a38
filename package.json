@@ -27,7 +27,7 @@
     "force-graph": "^1.52.0"
   },
   "devDependencies": {
-    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/api": "^1.10.0",
     "@playwright/test": "^1.64.1",
     "@sveltejs/adapter-node": "^6.0.0",
     "@sveltejs/kit": "^3.1.0",
@@ -35,7 +35,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "@types/better-sqlite3": "^9.6.0",
     "@types/d3-force": "^3.0.10",
-    "@types/node": "^24.0.0",
+    "@types/node": "^24.19.2",
     "svelte": "^5.57.2",
     "svelte-check": "^4.7.7",
     "tailwindcss": "^4.3.3",

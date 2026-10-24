@@ -2,7 +2,9 @@
 // Cases (Akten): groups of letters about one matter. Every change is logged in case_events together
 // with its inverse operation, so the user can undo anything, including edits made by the assistant.
 
-import { db, transaction, now, newId, listCols, readAnalysis, writeAnalysis, type DocumentRow } from './db.ts';
+import { db, transaction, now, newId, listCols, readAnalysis, writeAnalysis, UPLOAD_DIR, type DocumentRow } from './db.ts';
+import { existsSync, mkdtempSync, renameSync, rmSync, rmdirSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 
 export type Actor = 'user' | 'assistant' | 'system';
 export type CaseStatus = 'open' | 'closed';
@@ -23,6 +25,7 @@ export interface ChangeResult {
 }
 
 export class CaseError extends Error {}
+export class CaseChangedError extends CaseError {}
 
 const today = () => new Date().toISOString().slice(0, 10);
 const URGENCY_RANK: Record<string, number> = { high: 3, medium: 2, low: 1 };
@@ -266,4 +269,65 @@ export function undoEvent(eventId: number, actor: Actor = 'user') {
 		db.prepare(`UPDATE case_events SET undone = 1 WHERE id = ?`).run(eventId);
 		return log(actor, ev.case_id, 'undo', `Undone: ${ev.summary}`, null);
 	});
+}
+
+/** Explicit, permanent deletion. The confirmed membership must still match at deletion time. */
+export function deleteCasePermanently(caseId: string, expectedLetterIds: string[]) {
+	let staging: string | undefined;
+	const moved: { original: string; staged: string }[] = [];
+	let deletedLetters: string[];
+	try {
+		deletedLetters = transaction(() => {
+			requireCase(caseId);
+			const letters = db.prepare('SELECT id FROM documents WHERE case_id = ? ORDER BY id').all(caseId) as { id: string }[];
+			const ids = letters.map(letter => letter.id);
+			const expected = [...expectedLetterIds].sort();
+			if (ids.length !== expected.length || ids.some((id, index) => id !== expected[index])) {
+				throw new CaseChangedError('Case membership changed. Review its letters before deleting.');
+			}
+			// Only paths for these database records may be moved/deleted; never the uploads root.
+			const paths = ids.map(id => {
+				const path = resolve(UPLOAD_DIR, id);
+				if (!/^[\w-]+$/.test(id) || dirname(path) !== resolve(UPLOAD_DIR)) throw new CaseError('Invalid stored letter ID');
+				return { id, path };
+			});
+			const nodes = db.prepare('SELECT DISTINCT e.node_id FROM edges e JOIN documents d ON d.id = e.document_id WHERE d.case_id = ?').all(caseId) as { node_id: number }[];
+			for (const { id, path } of paths) {
+				if (!existsSync(path)) continue;
+				staging ??= mkdtempSync(join(UPLOAD_DIR, '.case-delete-'));
+				const staged = join(staging, id);
+				renameSync(path, staged);
+				moved.push({ original: path, staged });
+			}
+			for (const id of ids) {
+				db.prepare('DELETE FROM docs_fts WHERE doc_id = ?').run(id);
+				db.prepare('DELETE FROM documents WHERE id = ?').run(id); // edges cascade
+			}
+			for (const { node_id } of nodes) db.prepare('DELETE FROM nodes WHERE id = ? AND NOT EXISTS (SELECT 1 FROM edges WHERE node_id = ?)').run(node_id, node_id);
+			db.prepare('DELETE FROM case_events WHERE case_id = ?').run(caseId);
+			// Preserve other cases' history, but remove inverse operations targeting deleted records.
+			const events = db.prepare('SELECT id, undo_json FROM case_events WHERE undo_json IS NOT NULL').all() as { id: number; undo_json: string }[];
+			const deleted = new Set(ids);
+			for (const event of events) {
+				const op = JSON.parse(event.undo_json) as UndoOp;
+				if (('case_id' in op && op.case_id === caseId) || ('letter_id' in op && deleted.has(op.letter_id))
+					|| ('moves' in op && op.moves.some(move => move.case_id === caseId || deleted.has(move.letter_id)))) {
+					db.prepare('UPDATE case_events SET undo_json = NULL WHERE id = ?').run(event.id);
+				}
+			}
+			db.prepare('DELETE FROM cases WHERE id = ?').run(caseId);
+			return ids;
+		});
+	} catch (cause) {
+		// Until the DB commit succeeds, scans remain recoverable by moving them back.
+		for (const path of moved.reverse()) renameSync(path.staged, path.original);
+		if (staging) rmdirSync(staging);
+		throw cause;
+	}
+	let cleanupPending = false;
+	if (staging) {
+		try { rmSync(staging, { recursive: true, force: true }); }
+		catch { cleanupPending = true; console.error('Deleted case scan cleanup needs attention.'); }
+	}
+	return { id: caseId, deleted_letters: deletedLetters, cleanup_pending: cleanupPending };
 }

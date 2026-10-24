@@ -4,4 +4,9 @@ import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 
-export default defineConfig({ plugins: [tailwindcss(), sveltekit({ adapter: adapter(), preprocess: vitePreprocess() })] });
+const testOutDir = process.env.APPELLA_TEST_OUT_DIR;
+
+export default defineConfig({
+  cacheDir: testOutDir ? `${testOutDir}/vite-cache` : undefined,
+  plugins: [tailwindcss(), sveltekit({ adapter: adapter(), preprocess: vitePreprocess(), ...(testOutDir ? { outDir: testOutDir } : {}) })]
+});

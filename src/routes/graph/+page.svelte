@@ -23,7 +23,7 @@
     const lang = isDemo ? language.current : 'en';
     void reload;
     const abort = new AbortController();
-    loading = true; failed = false; selected = null;
+    loading = true; failed = false; selected = null; data = null;
     (async () => {
       try {
         const result = isDemo ? (await import('#lib/mock/data.ts')).mockGraph(lang) : await request<GraphData>('/api/graph', { signal: abort.signal });

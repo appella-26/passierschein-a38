@@ -14,6 +14,8 @@ export default defineConfig({
     // Wire the phone assistant to the fake ElevenLabs/Twilio API in tests/agent-api.spec.ts,
     // so no test can ever place a real call. These override anything in .env.
     env: {
+      // Keep mock phone credentials out of the generated config watched by a normal dev server.
+      APPELLA_TEST_OUT_DIR: '.svelte-kit/playwright',
       ELEVENLABS_API_URL: 'http://127.0.0.1:5199',
       ELEVENLABS_API_KEY: 'test-key',
       ELEVENLABS_AGENT_ID: 'agent_test',
