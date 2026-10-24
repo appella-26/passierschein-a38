@@ -182,7 +182,7 @@ export function createCase(title: string, letterIds: string[], actor: Actor): Ch
 			db.prepare(`UPDATE documents SET case_id = ? WHERE id = ?`).run(id, lid);
 			return { letter_id: lid, case_id: d.case_id ?? id };
 		});
-		return log(actor, id, 'case_created', `Akte „${t}" angelegt${moves.length ? ` mit ${moves.length} Brief(en)` : ''}`, {
+		return log(actor, id, 'case_created', `Created case "${t}"${moves.length ? ` with ${moves.length} letter${moves.length === 1 ? '' : 's'}` : ''}`, {
 			op: 'delete_case', case_id: id, moves
 		});
 	});
@@ -194,7 +194,7 @@ export function renameCase(caseId: string, title: string, actor: Actor): ChangeR
 	if (!t) throw new CaseError('Title must not be empty');
 	return transaction(() => {
 		apply({ op: 'rename_case', case_id: caseId, title: t });
-		return log(actor, caseId, 'case_renamed', `Akte umbenannt: „${c.title}" → „${t}"`, {
+		return log(actor, caseId, 'case_renamed', `Renamed case "${c.title}" to "${t}"`, {
 			op: 'rename_case', case_id: caseId, title: c.title
 		});
 	});
@@ -205,7 +205,7 @@ export function setCaseStatus(caseId: string, status: CaseStatus, actor: Actor):
 	if (status !== 'open' && status !== 'closed') throw new CaseError('status must be open or closed');
 	return transaction(() => {
 		apply({ op: 'set_case_status', case_id: caseId, status });
-		return log(actor, caseId, 'case_status', status === 'closed' ? `Akte „${c.title}" geschlossen` : `Akte „${c.title}" wieder geöffnet`, {
+		return log(actor, caseId, 'case_status', status === 'closed' ? `Closed case "${c.title}"` : `Reopened case "${c.title}"`, {
 			op: 'set_case_status', case_id: caseId, status: c.status
 		});
 	});
@@ -215,7 +215,7 @@ export function setCaseNotes(caseId: string, notes: string, actor: Actor): Chang
 	const c = requireCase(caseId);
 	return transaction(() => {
 		apply({ op: 'set_notes', case_id: caseId, notes });
-		return log(actor, caseId, 'notes_changed', `Notizen in „${c.title}" geändert`, { op: 'set_notes', case_id: caseId, notes: c.notes });
+		return log(actor, caseId, 'notes_changed', `Changed notes in "${c.title}"`, { op: 'set_notes', case_id: caseId, notes: c.notes });
 	});
 }
 
@@ -224,7 +224,7 @@ export function addCaseNote(caseId: string, note: string, actor: Actor): ChangeR
 	const line = `${today()}: ${note.trim()}`;
 	return transaction(() => {
 		apply({ op: 'set_notes', case_id: caseId, notes: c.notes ? `${c.notes}\n${line}` : line });
-		return log(actor, caseId, 'note_added', `Notiz zu „${c.title}": ${note.trim().slice(0, 80)}`, {
+		return log(actor, caseId, 'note_added', `Note on "${c.title}": ${note.trim().slice(0, 80)}`, {
 			op: 'set_notes', case_id: caseId, notes: c.notes
 		});
 	});
@@ -236,7 +236,7 @@ export function moveLetter(letterId: string, caseId: string, actor: Actor): Chan
 	if (d.case_id === caseId) throw new CaseError('Letter is already in this case');
 	return transaction(() => {
 		apply({ op: 'move_letter', letter_id: letterId, case_id: caseId });
-		return log(actor, caseId, 'letter_moved', `„${d.document_type}" in Akte „${target.title}" verschoben`, {
+		return log(actor, caseId, 'letter_moved', `Moved "${d.document_type}" to case "${target.title}"`, {
 			op: 'move_letter', letter_id: letterId, case_id: d.case_id ?? caseId
 		});
 	});
@@ -249,7 +249,7 @@ export function setTodoDone(letterId: string, index: number, done: boolean, acto
 	if (!todo) throw new CaseError(`Letter ${letterId} has no to-do #${index}`);
 	return transaction(() => {
 		apply({ op: 'set_todo', letter_id: letterId, index, done });
-		return log(actor, d.case_id ?? '', 'todo', `${done ? 'Erledigt' : 'Wieder offen'}: ${todo.title}`, {
+		return log(actor, d.case_id ?? '', 'todo', `${done ? 'Done' : 'Reopened'}: ${todo.title}`, {
 			op: 'set_todo', letter_id: letterId, index, done: !!todo.done
 		});
 	});
@@ -264,6 +264,6 @@ export function undoEvent(eventId: number, actor: Actor = 'user') {
 	return transaction(() => {
 		apply(JSON.parse(ev.undo_json) as UndoOp);
 		db.prepare(`UPDATE case_events SET undone = 1 WHERE id = ?`).run(eventId);
-		return log(actor, ev.case_id, 'undo', `Rückgängig: ${ev.summary}`, null);
+		return log(actor, ev.case_id, 'undo', `Undone: ${ev.summary}`, null);
 	});
 }
