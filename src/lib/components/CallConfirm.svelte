@@ -27,8 +27,8 @@
     void enableSound();
     const input = { toNumber: normalized, senderName: doc.analysis.sender.name, purpose: purpose.trim(), reference, letterDate: doc.analysis.letter_date ?? undefined };
     try {
-      const result = demo ? { id: 'demo-call', state: 'dialing' as CallState } : await post<{ id: string; state: CallState }>('/api/calls', input);
-      saveCallContext({ id: result.id, ...input, letterId: doc.id, demo });
+      const result = demo ? { id: 'demo-call', state: 'dialing' as CallState, mode: undefined } : await post<{ id: string; state: CallState; mode?: 'phone' | 'browser' }>('/api/calls', input);
+      saveCallContext({ id: result.id, ...input, letterId: doc.id, demo, mode: result.mode });
       open = false;
       await goto(`/calls/${encodeURIComponent(result.id)}${demo ? '?demo=1' : ''}`);
     } catch (error) { failed = error instanceof ApiError && error.status === 503 ? 'callNotConfigured' : 'error'; }

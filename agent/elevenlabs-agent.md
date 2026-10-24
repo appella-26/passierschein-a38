@@ -107,3 +107,10 @@ Teammate's phone = "Finanzamt". Set `DEMO_TARGET_NUMBER` to it.
 3. Agent introduces Kevin → transfer → Kevin's phone rings on stage → Kevin picks up. The UI shows the timeline in real time.
 
 Rehearse at least twice. It's the money shot of the demo.
+
+### Without a phone number
+
+With no `ELEVENLABS_PHONE_NUMBER_ID` (or `CALL_MODE=browser`) the teammate opens the **demo hotline** link
+from Kevin's call screen on their own device instead of answering a phone, and plays steps 1–2 into it.
+After the introduction the hotline page ends the agent's session and the app shows "connected"; Kevin and
+the teammate carry on in person. The agent needs no changes for this.

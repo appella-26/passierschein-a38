@@ -113,6 +113,29 @@ test('call confirmation sends only reviewed metadata and requires consent', asyn
   await expect(page.getByRole('heading', { name: sample.sender_name })).toBeVisible();
 });
 
+test('a browser-mode call shows the demo hotline link', async ({ page }) => {
+  await mockApi(page);
+  await page.route('**/api/calls', route => route.fulfill({ json: { id: 'test-call', state: 'dialing', mode: 'browser' } }));
+  await page.route('**/api/calls/test-call/events', route => route.fulfill({ contentType: 'text/event-stream', body: `data: ${JSON.stringify({ state: 'dialing', at: new Date().toISOString() })}\n\n` }));
+  await page.goto(`/letters/${sample.id}`);
+  await page.getByRole('button', { name: 'In der Warteschleife warten', exact: true }).click();
+  const sheet = page.getByRole('dialog');
+  await sheet.getByLabel('Rufnummer', { exact: true }).fill('0621 / 292-0');
+  await sheet.getByRole('checkbox').check();
+  await sheet.getByRole('button', { name: 'Anruf starten & Warteschleife übergeben', exact: true }).click();
+  await expect(page).toHaveURL('/calls/test-call');
+  await expect(page.getByRole('heading', { name: 'Demo-Hotline' })).toBeVisible();
+  await expect(page.getByLabel('Link der Demo-Hotline')).toHaveValue(/\/hotline\/test-call$/);
+});
+
+test('the demo hotline explains when its call is gone', async ({ page }) => {
+  await page.route('**/api/calls/old-call/session', route => route.fulfill({ status: 409, json: { message: 'This call has already ended' } }));
+  await page.goto('/hotline/old-call');
+  await expect(page.getByRole('heading', { name: 'Eingehender Anruf' })).toBeVisible();
+  await page.getByRole('button', { name: 'Anruf annehmen', exact: true }).click();
+  await expect(page.getByRole('heading', { name: /nicht mehr verfügbar/ })).toBeVisible();
+});
+
 test('call confirmation explains when the phone assistant is not set up', async ({ page }) => {
   await mockApi(page);
   await page.route('**/api/calls', route => route.fulfill({ status: 503, json: { message: 'ElevenLabs is not configured.', missing: ['ELEVENLABS_PHONE_NUMBER_ID'] } }));

@@ -15,6 +15,7 @@
   let cancelling = $state(false);
   let cancelError = $state(false);
   let soundError = $state(false);
+  let linkCopied = $state(false);
   const demo = $derived(import.meta.env.DEV && page.url.searchParams.get('demo') === '1');
   const context = $derived(callSession.context?.id === page.params.id ? callSession.context : null);
   const callStatus = $derived(callSession.state);
@@ -27,6 +28,9 @@
     if (event.state !== 'on_hold') return seconds;
     return seconds + Math.max(0, ((events[index + 1] ? Date.parse(events[index + 1].at) : now) - Date.parse(event.at)) / 1000);
   }, 0));
+  const browser = $derived(context?.mode === 'browser');
+  const hotlineUrl = $derived(browser ? `${page.url.origin}/hotline/${encodeURIComponent(page.params.id ?? '')}` : '');
+  const localhost = $derived(['localhost', '127.0.0.1', '[::1]'].includes(page.url.hostname));
   const icon = $derived((answered ? 'phone' : callStatus === 'voicemail' ? 'voicemail' : callStatus === 'failed' ? 'warning' : callStatus === 'ended' ? 'check' : 'headset') as IconName);
 
   onMount(() => { const timer = setInterval(() => now = Date.now(), 1000); return () => clearInterval(timer); });
@@ -47,6 +51,9 @@
     finally { cancelling = false; }
   }
   async function activateSound() { soundError = !await enableSound(); }
+  async function copyLink() {
+    try { await navigator.clipboard.writeText(hotlineUrl); linkCopied = true; } catch { linkCopied = false; }
+  }
 </script>
 
 <svelte:head><title>{t('liveCall')} · {t('brand')}</title></svelte:head>
@@ -62,7 +69,7 @@
         <p class="eyebrow mb-3 {answered ? 'text-secondary' : callStatus === 'failed' ? 'text-error' : 'text-outline'}">{t(callStatus)}</p>
         <h1 class="max-w-md font-headline text-headline-xl-mobile text-primary sm:text-headline-xl">{t(answered && callStatus !== 'connected' ? 'humanTitle' : callStatus)}</h1>
         {#if context}<p class="mt-3 text-label-lg text-primary">{context.senderName}</p>{/if}
-        <p class="mt-4 max-w-md text-body-md leading-relaxed text-on-surface-variant">{t(answered ? callStatus === 'connected' ? 'connectedHint' : 'humanHint' : callStatus === 'voicemail' ? 'voicemailHint' : callStatus === 'failed' ? 'failedHint' : 'endedHint')}</p>
+        <p class="mt-4 max-w-md text-body-md leading-relaxed text-on-surface-variant">{t(answered ? callStatus === 'connected' ? (browser ? 'connectedHintBrowser' : 'connectedHint') : (browser ? 'humanHintBrowser' : 'humanHint') : callStatus === 'voicemail' ? 'voicemailHint' : callStatus === 'failed' ? 'failedHint' : 'endedHint')}</p>
         <div class="mt-7 flex w-full max-w-sm flex-col gap-3">{#if !terminal}<Button variant={answered ? 'secondary' : 'danger'} disabled={cancelling} onclick={cancel}><Icon name="close" size={19} />{t(cancelling ? 'cancellingCall' : 'cancelCall')}</Button>{/if}{#if context}<a href={`/letters/${encodeURIComponent(context.letterId)}${demo ? '?demo=1' : ''}`} class="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-white px-4 text-label-lg text-primary"><Icon name="document" />{t('backToLetter')}</a>{/if}<a href={'/' + (demo ? '?demo=1' : '')} class="flex min-h-12 items-center justify-center rounded-xl text-label-lg text-primary">{t('overview')}</a></div>
       </section>
     {:else}
@@ -75,6 +82,16 @@
       <div class="grid gap-3 sm:grid-cols-2"><Button variant="danger" onclick={cancel} disabled={cancelling || callSession.connection === 'loading'}><Icon name="close" />{t(cancelling ? 'cancellingCall' : 'cancelCall')}</Button><a href={'/' + (demo ? '?demo=1' : '')} class="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-surface-container px-4 text-label-lg text-primary">{t('overview')}<Icon name="arrow" size={18} /></a></div>
     {/if}
     {#if cancelError}<p role="alert" class="rounded-xl bg-error-container p-3 text-body-sm text-on-error-container">{t('cancelFailed')}</p>{/if}
+    {#if browser && !terminal && !answered}
+      <Card class="space-y-3">
+        <h2 class="flex items-center gap-2 font-headline text-headline-md text-primary"><Icon name="headset" />{t('hotlineTitle')}</h2>
+        <p class="text-body-sm text-on-surface-variant">{t('hotlineIntro', { sender: context?.senderName ?? '' })}</p>
+        <label for="hotline-url" class="eyebrow block text-on-surface-variant">{t('hotlineLink')}</label>
+        <input id="hotline-url" class="paper-input font-mono text-body-sm" readonly value={hotlineUrl} onfocus={event => event.currentTarget.select()} />
+        <Button variant="secondary" class="w-full" onclick={copyLink}><Icon name="copy" />{t(linkCopied ? 'copied' : 'copyLink')}</Button>
+        {#if localhost}<p class="text-body-sm text-error">{t('hotlineLocalhost')}</p>{/if}
+      </Card>
+    {/if}
     {#if !terminal}<Card class="space-y-2"><Button variant="secondary" class="w-full" onclick={activateSound} disabled={notification.enabled}><Icon name="volume" />{t(notification.enabled ? 'soundEnabled' : 'enableSound')}</Button><p class="text-[11px] leading-5 text-outline">{t('soundHint')}</p>{#if soundError}<p role="status" class="text-body-sm text-outline">{t('soundUnavailable')}</p>{/if}</Card>{/if}
     <Card class="space-y-5"><h2 class="font-headline text-headline-md text-primary">{t('callTimeline')}</h2>{#if callSession.events.length}<Timeline events={callSession.events} />{:else}<p role="status" class="text-body-sm text-outline">{t('loading')}</p>{/if}</Card>
   {/if}
