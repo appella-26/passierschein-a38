@@ -173,6 +173,7 @@ design tokens are in `src/app.css`. The original Stitch references are in `desig
 - `/calls/:id`: live SSE timeline, queue timer, human-answer alert and cancellation.
 - `/archive`: bilingual search and filters, including completion from server-backed checklists.
 - `/graph`: interactive document connections, plus keyboard-accessible document links.
+  Disconnected groups are gently centered while keeping existing link distances and collision spacing.
 - `/assistant`: chat about letters, deadlines and cases, with clickable references and Undo for edits.
 
 English is the default; an explicitly saved DE/EN preference takes priority. The toggle changes the
@@ -181,6 +182,8 @@ translated. PDFs and HEIC must first be exported as images. Web fonts are fetche
 the Gemini provider, letter images and analysis data are sent to Google for the requested analysis; with
 Ollama they remain local. Sound/vibration support varies by browser, and the page must remain open for
 alerts. Returning from analysis stops the browser's wait, not necessarily the provider request.
+Double-tap zoom is disabled for the app's touch UI; pinch/browser zoom and the graph's explicit zoom controls
+remain available. Phone inputs use at least 16px text to avoid iOS focus magnification.
 Upload errors distinguish configuration, rate limits, invalid model responses and connectivity problems
 without displaying raw provider messages. Selected pages stay available for retry; `Retry-After` is shown
 when the service supplies it. Payment details must be checked against the original; Appella never initiates payment.

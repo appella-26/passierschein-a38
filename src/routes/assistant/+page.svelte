@@ -23,6 +23,7 @@
   let keyboardInset = $state(0);
   let keyboardOpen = $state(false);
   let followBottom = true;
+  let lastFollowScrollY = 0;
   let previewCaseId = $state('');
   let previewOpen = $state(false);
   let previewRevision = $state(0);
@@ -41,6 +42,7 @@
     const abort = new AbortController();
     let active: ChatThread | null = null;
     thread = null; contextTitle = ''; contextLetterId = null; contextFailed = false; contextLoading = true;
+    followBottom = true; lastFollowScrollY = 0;
     previewOpen = false; confirmOpen = false; callDoc = null; callAction = null;
     actionController?.abort(); actionLoading = false;
     (async () => {
@@ -79,6 +81,7 @@
   function submit(value = thread?.draft ?? '') {
     if (!thread || contextLoading || contextFailed || thread.pending || thread.undoing) return;
     followBottom = true;
+    lastFollowScrollY = window.scrollY;
     void sendChat(thread, value, language.current, contextLetterId);
   }
   async function undoChange(change: ChatChange) {
@@ -113,21 +116,31 @@
     const last = thread?.messages.at(-1);
     void last?.content; void last?.status; void last?.changes.length; void thread?.activity;
     void composerHeight; void keyboardInset;
-    if (last && untrack(() => followBottom)) void tick().then(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }));
+    if (last && untrack(() => followBottom)) void tick().then(() => {
+      // Scroll events can arrive after a new token: re-check the actual position before moving it.
+      if (!followBottom || window.scrollY < lastFollowScrollY - 2) { followBottom = false; return; }
+      window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' });
+      lastFollowScrollY = window.scrollY;
+    });
   });
   onMount(() => {
-    const fullHeight = window.innerHeight;
+    let fullHeight = window.innerHeight;
+    let fullWidth = window.innerWidth;
     const viewport = window.visualViewport;
     const updateKeyboard = () => {
+      if (window.innerWidth !== fullWidth) { fullWidth = window.innerWidth; fullHeight = window.innerHeight; }
       const focused = document.activeElement === input;
       const gap = viewport ? Math.max(0, window.innerHeight - viewport.height - viewport.offsetTop) : 0;
-      keyboardOpen = focused && !!viewport && (gap > 150 || viewport.height < fullHeight * 0.75);
+      keyboardOpen = focused && !!viewport && (viewport.scale ?? 1) <= 1.01 && (gap > 150 || viewport.height < fullHeight * 0.75);
       keyboardInset = keyboardOpen ? gap : 0;
       if (keyboardOpen) document.documentElement.dataset.chatKeyboardOpen = 'true';
       else delete document.documentElement.dataset.chatKeyboardOpen;
     };
     const focus = () => queueMicrotask(updateKeyboard);
-    const scroll = () => { followBottom = document.documentElement.scrollHeight - window.scrollY - window.innerHeight < 160; };
+    const scroll = () => {
+      followBottom = document.documentElement.scrollHeight - window.scrollY - window.innerHeight < 160;
+      if (followBottom) lastFollowScrollY = window.scrollY;
+    };
     const observer = new ResizeObserver(() => { if (composer) composerHeight = composer.getBoundingClientRect().height; });
     if (composer) observer.observe(composer);
     viewport?.addEventListener('resize', updateKeyboard); viewport?.addEventListener('scroll', updateKeyboard);
@@ -146,7 +159,7 @@
 <div class="mx-auto max-w-2xl" style:padding-bottom={`${composerHeight + keyboardInset}px`}>
   <div class="flex items-center justify-between gap-3">
     <h1 class="font-headline text-headline-lg-mobile text-primary md:text-headline-lg">{t('chat')}</h1>
-    {#if thread?.messages.length}<button type="button" disabled={thread.pending || thread.undoing} class="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-label-md text-outline hover:bg-surface-container disabled:opacity-50" onclick={() => { if (thread) clearChat(thread); followBottom = true; }}><Icon name="plus" size={17} />{t('chatNew')}</button>{/if}
+    {#if thread?.messages.length}<button type="button" disabled={thread.pending || thread.undoing} class="inline-flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-label-md text-outline hover:bg-surface-container disabled:opacity-50" onclick={() => { if (thread) clearChat(thread); followBottom = true; lastFollowScrollY = 0; }}><Icon name="plus" size={17} />{t('chatNew')}</button>{/if}
   </div>
   {#if contextTitle}<div class="mt-3 flex items-start justify-between gap-2 rounded-xl bg-surface-container-low px-3 py-2 text-body-sm text-primary"><span class="min-w-0">{t('chatAbout')}: {contextTitle}</span><a href={'/assistant' + (demo ? '?demo=1' : '')} class="touch-icon -mr-2 -mt-1 text-outline" aria-label={t('chatAllLetters')}><Icon name="close" size={17} /></a></div>{/if}
   {#if contextLoading}<p role="status" class="mt-6 text-body-sm text-outline">{t('loading')}</p>

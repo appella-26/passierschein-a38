@@ -5,7 +5,7 @@
   import { ApiError, getDocument } from '#lib/api.ts';
   import { deadlineLabel, formatDate } from '#lib/format.ts';
   import { language, t } from '#lib/i18n.ts';
-  import { completedActions } from '#lib/checklist.svelte.ts';
+  import { completedActions, isDocumentDone } from '#lib/checklist.svelte.ts';
   import Card from '#lib/components/Card.svelte';
   import Button from '#lib/components/Button.svelte';
   import Icon from '#lib/components/Icon.svelte';
@@ -32,6 +32,13 @@
   let today = $state(new Date());
   const demo = $derived(import.meta.env.DEV && page.url.searchParams.get('demo') === '1');
   const completed = $derived(doc ? completedActions(doc, demo) : []);
+  const documentDone = $derived(!!doc && isDocumentDone(doc, demo));
+  const paymentTasks = $derived(doc?.analysis.action_items.flatMap((action, index) => action.type === 'pay' ? [index] : []) ?? []);
+  const paymentDone = $derived(paymentTasks.length > 0 && paymentTasks.every(index => completed.includes(index)));
+  const amountResolved = $derived(paymentDone || documentDone);
+  const deadlineTasks = $derived(doc?.analysis.deadline ? doc.analysis.action_items.flatMap((action, index) => action.due === doc!.analysis.deadline ? [index] : []) : []);
+  const deadlineResolved = $derived(documentDone || (deadlineTasks.length > 0 && deadlineTasks.every(index => completed.includes(index))));
+  const noticeResolved = $derived(!!doc && (!doc.analysis.amount_due || amountResolved) && (!doc.analysis.deadline || deadlineResolved));
 
   $effect(() => {
     const id = page.params.id;
@@ -81,27 +88,27 @@
           <span class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-surface-container text-primary"><Icon name="bank" size={24} /></span>
           <div class="min-w-0"><p class="eyebrow text-outline">{t('sender')}</p><p class="text-label-lg text-primary">{doc.analysis.sender.name}</p></div>
         </div>
-        <div class="max-w-[42%] shrink-0"><Pill urgency={doc.analysis.urgency} label={doc.analysis.urgency === 'high' ? t('urgent') : undefined} /></div>
+        <div class="max-w-[42%] shrink-0"><Pill urgency={documentDone ? 'low' : doc.analysis.urgency} label={documentDone ? t('done') : doc.analysis.urgency === 'high' ? t('urgent') : undefined} /></div>
       </div>
       <h1 class="font-headline text-headline-lg-mobile text-primary md:text-headline-lg">{doc.analysis.document_type}</h1>
       {#if doc.analysis.letter_date}<p class="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-body-sm text-on-surface-variant"><Icon name="calendar" size={16} class="shrink-0" /><span>{t('letterDate')}</span><time datetime={doc.analysis.letter_date} class="whitespace-nowrap">{formatDate(doc.analysis.letter_date, true)}</time></p>{/if}
     </Card>
     {#if doc.analysis.deadline || doc.analysis.amount_due}
       <Card class="relative overflow-hidden !pl-5">
-        <div class="absolute inset-y-0 left-0 w-1 {doc.analysis.urgency === 'high' ? 'bg-error' : 'bg-on-tertiary-container'}"></div>
+        <div class="absolute inset-y-0 left-0 w-1 {noticeResolved ? 'bg-secondary' : doc.analysis.urgency === 'high' ? 'bg-error' : 'bg-on-tertiary-container'}"></div>
         <div class="space-y-4">
-          <h2 class="eyebrow flex items-center gap-1.5 {doc.analysis.urgency === 'high' ? 'text-error' : 'text-on-tertiary-fixed-variant'}"><Icon name="clock" size={16} />{t(doc.analysis.deadline ? 'deadline' : 'amount')}</h2>
+          <h2 class="eyebrow flex items-center gap-1.5 {noticeResolved ? 'text-secondary' : doc.analysis.urgency === 'high' ? 'text-error' : 'text-on-tertiary-fixed-variant'}"><Icon name={noticeResolved ? 'check' : 'clock'} size={16} />{t(noticeResolved ? paymentDone ? 'paymentCompleted' : 'done' : doc.analysis.deadline ? 'deadline' : 'amount')}</h2>
           <div class="grid items-center gap-4 {doc.analysis.amount_due && doc.analysis.deadline ? 'sm:grid-cols-2' : ''}">
             {#if doc.analysis.amount_due}
               <div>
-                <p class="whitespace-nowrap font-headline text-headline-xl-mobile font-semibold {doc.analysis.urgency === 'high' ? 'text-error' : 'text-on-tertiary-fixed-variant'}">{doc.analysis.amount_due}</p>
-                <p class="mt-1 text-body-sm text-on-surface-variant">{t('amount')}</p>
+                <p class="whitespace-nowrap font-headline {amountResolved ? 'text-headline-md text-primary' : `text-headline-xl-mobile font-semibold ${doc.analysis.urgency === 'high' ? 'text-error' : 'text-on-tertiary-fixed-variant'}`}">{doc.analysis.amount_due}</p>
+                <p class="mt-1 flex items-center gap-1.5 text-body-sm {paymentDone && !noticeResolved ? 'text-secondary' : 'text-on-surface-variant'}">{#if paymentDone && !noticeResolved}<Icon name="check" size={15} />{t('paymentCompleted')}{:else}{t('amount')}{/if}</p>
               </div>
             {/if}
             {#if doc.analysis.deadline}
-              <div class="flex items-start gap-2 text-primary">
-                <Icon name="calendar" size={19} class="mt-0.5 shrink-0" />
-                <div><p class="text-label-lg">{deadlineLabel(doc.analysis.deadline, today)}</p><time datetime={doc.analysis.deadline} class="mt-1 block whitespace-nowrap text-body-sm text-on-surface-variant">{formatDate(doc.analysis.deadline)}</time></div>
+              <div class="flex items-start gap-2 {deadlineResolved ? 'text-outline' : 'text-primary'}">
+                <Icon name="calendar" size={deadlineResolved ? 16 : 19} class="mt-0.5 shrink-0" />
+                <div><p class={deadlineResolved ? 'text-body-sm text-outline' : 'text-label-lg'}>{deadlineResolved ? t('originalDeadline') : deadlineLabel(doc.analysis.deadline, today)}</p><time datetime={doc.analysis.deadline} class="mt-1 block whitespace-nowrap text-body-sm text-on-surface-variant">{formatDate(doc.analysis.deadline)}</time></div>
               </div>
             {/if}
           </div>

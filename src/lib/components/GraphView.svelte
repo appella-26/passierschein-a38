@@ -1,7 +1,7 @@
 <script lang="ts">
   import type ForceGraph from 'force-graph';
   import type { NodeObject } from 'force-graph';
-  import { forceCollide } from 'd3-force';
+  import { forceCollide, forceX, forceY } from 'd3-force';
   import type { GraphData, GraphNode, GraphLink } from '#lib/types.ts';
   import { nodeColors } from '#lib/graph.ts';
   import { t } from '#lib/i18n.ts';
@@ -73,6 +73,9 @@
         instance.d3Force('charge')?.strength?.(-100);
         instance.d3Force('link')?.distance?.(100);
         instance.d3Force('collision', forceCollide<ForceNode>(88).strength(0.9).iterations(3));
+        // Gently bring disconnected groups together without shortening links or weakening collision protection.
+        instance.d3Force('x', forceX<ForceNode>(0).strength(0.015));
+        instance.d3Force('y', forceY<ForceNode>(0).strength(0.015));
         instance.d3ReheatSimulation();
         graph = instance;
         observer = new ResizeObserver(entries => {
@@ -89,5 +92,5 @@
 <div class="relative">
   <div bind:this={host} class="h-[380px] w-full overflow-hidden rounded-xl bg-surface-container-low md:h-[500px]" role="img" aria-label={t('graphCanvas')}></div>
   {#if !ready}<div class="absolute inset-0 flex items-center justify-center p-4 text-center text-body-sm text-outline" role="status">{#if failed}<div><p>{t('graphLoadError')}</p><button type="button" class="mt-3 min-h-11 rounded-xl bg-primary px-4 text-label-md text-white" onclick={() => reload++}>{t('retry')}</button></div>{:else}{t('loading')}{/if}</div>{/if}
-  <div class="absolute bottom-3 right-3 flex gap-1 rounded-xl border border-surface-container bg-white p-1 shadow-paper"><button type="button" class="touch-icon text-primary" disabled={!ready} aria-label={t('zoomOut')} onclick={() => graph?.zoom(Math.max(0.05, graph.zoom() / 1.3), 0)}><Icon name="minus" /></button><button type="button" class="touch-icon text-primary" disabled={!ready} aria-label={t('zoomIn')} onclick={() => graph?.zoom(Math.min(4, graph.zoom() * 1.3), 0)}><Icon name="plus" /></button><button type="button" class="touch-icon text-primary" disabled={!ready} aria-label={t('resetGraph')} onclick={() => graph?.zoomToFit(0, 56)}><Icon name="scan" /></button></div>
+  <div class="mt-2 flex justify-end"><div class="flex gap-1 rounded-xl border border-surface-container bg-white p-1 shadow-paper"><button type="button" class="touch-icon text-primary" disabled={!ready} aria-label={t('zoomOut')} onclick={() => graph?.zoom(Math.max(0.05, graph.zoom() / 1.3), 0)}><Icon name="minus" /></button><button type="button" class="touch-icon text-primary" disabled={!ready} aria-label={t('zoomIn')} onclick={() => graph?.zoom(Math.min(4, graph.zoom() * 1.3), 0)}><Icon name="plus" /></button><button type="button" class="touch-icon text-primary" disabled={!ready} aria-label={t('resetGraph')} onclick={() => graph?.zoomToFit(0, 56)}><Icon name="scan" /></button></div></div>
 </div>

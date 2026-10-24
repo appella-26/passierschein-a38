@@ -196,6 +196,39 @@ test('a terminal event without an answer or action is an error, not an empty bub
   await expect(page.getByRole('alert')).toContainText('couldn’t finish the reply');
 });
 
+test('a normal conversation survives visiting the isolated demo', async ({ page }) => {
+  await installStream(page); await page.goto('/assistant'); await send(page, 'A normal chat question.');
+  await emit(page, { type: 'text', delta: 'Normal conversation answer.' }, { type: 'done' });
+  async function navigate(href: string) {
+    await page.evaluate(url => { const a = document.createElement('a'); a.id = 'test-chat-nav'; a.href = url; a.textContent = 'Navigate'; a.style.cssText = 'position:fixed;top:0;left:0;z-index:9999;background:white'; document.body.append(a); }, href);
+    await page.locator('#test-chat-nav').click(); await expect(page).toHaveURL(href); await page.locator('#test-chat-nav').evaluate(a => a.remove());
+  }
+  await navigate('/assistant?demo=1');
+  await expect(page.getByRole('log')).not.toBeVisible();
+  await send(page, 'What needs my attention?');
+  await expect(page.getByRole('log')).toContainText('tax office');
+  await navigate('/assistant');
+  await expect(page.getByRole('log')).toContainText('Normal conversation answer.');
+  await expect(page.getByRole('log')).not.toContainText('tax office');
+  expect((await requests(page)).length).toBe(1);
+});
+
+test('streaming does not pull readers away from earlier messages and New chat clears only the conversation', async ({ page }) => {
+  await installStream(page); await page.goto('/assistant'); await send(page);
+  await emit(page, { type: 'text', delta: 'A long answer.\n\n'.repeat(70) });
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(200);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  await emit(page, { type: 'text', delta: 'A new part at the end.' });
+  await expect(page.getByRole('log')).toContainText('A new part at the end.');
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  await emit(page, { type: 'done' });
+  await page.getByRole('button', { name: 'New chat', exact: true }).click();
+  await expect(page.getByRole('log')).not.toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Message' })).toHaveValue('');
+  expect((await requests(page)).length).toBe(1);
+});
+
 test('demo chat edits and Undo stay local and cannot leak into normal chat', async ({ page }) => {
   const api: string[] = [];
   page.on('request', request => { if (new URL(request.url()).pathname.startsWith('/api/')) api.push(request.url()); });
@@ -244,6 +277,8 @@ test('mobile keyboard keeps the composer visible and restores navigation on exit
   });
   await page.goto('/assistant');
   const input = page.getByRole('textbox', { name: 'Message' });
+  await expect(input).toBeEnabled();
+  await expect(input).toHaveCSS('font-size', '16px');
   await input.focus();
   await page.evaluate(() => (window as unknown as { setKeyboard: (height: number) => void }).setKeyboard(440));
   await expect(page.locator('html')).toHaveAttribute('data-chat-keyboard-open', 'true');

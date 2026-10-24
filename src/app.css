@@ -131,8 +131,10 @@
     --bottom-nav-height: calc(var(--nav-content-height) + var(--nav-safe-padding) + 1px);
     --page-action-height: 72px;
   }
-  html { background: var(--color-background); color: var(--color-on-surface); font-family: var(--font-sans); scroll-padding-top: 96px; }
-  body { margin: 0; min-width: 320px; }
+  /* Disable accidental double-tap zoom while retaining scrolling, pinch zoom and text selection. */
+  html { background: var(--color-background); color: var(--color-on-surface); font-family: var(--font-sans); scroll-padding-top: 96px; touch-action: manipulation; }
+  body { margin: 0; min-width: 320px; touch-action: manipulation; }
+  dialog, button, a, input, textarea, summary { touch-action: manipulation; }
   button, a, input, textarea { -webkit-tap-highlight-color: transparent; }
   button:not(:disabled), label[for], summary { cursor: pointer; }
   :focus-visible { outline: 2px solid var(--color-secondary); outline-offset: 4px; }
@@ -161,6 +163,8 @@
   .paper-input { width: 100%; min-height: 48px; border: 1px solid var(--color-outline-variant); border-radius: 12px; padding: 12px; background: white; font-size: 14px; }
   .no-scrollbar { scrollbar-width: none; }
   .no-scrollbar::-webkit-scrollbar { display: none; }
+  /* iOS magnifies focused inputs smaller than 16px, even when double-tap zoom is disabled. */
+  @media (max-width: 639px) { .paper-input { font-size: 16px; } }
   @media (min-width: 1024px) { .page-column { padding-top: 32px; } }
 }
 

@@ -309,7 +309,7 @@ for (const width of [375, 390, 430, 768, 1366]) {
   for (const lang of ['de', 'en'] as const) {
     test(`actual sticky layouts at ${width}px in ${lang}`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 900 });
-      await page.clock.setFixedTime(new Date('2026-10-24T10:00:00Z'));
+      // Use a native advancing clock for canvas rendering. Calendar-date behavior is covered separately.
       await page.addInitScript(value => localStorage.setItem('appella.language', value), lang);
       const errors: string[] = [];
       page.on('pageerror', error => errors.push(error.message));
@@ -324,7 +324,14 @@ for (const width of [375, 390, 430, 768, 1366]) {
         await expect(page.locator('html')).toHaveAttribute('lang', lang);
         await page.evaluate(() => document.fonts.ready);
         if (name === 'home' || name === 'archive') await expect(page.locator('.letter-card').first()).toContainText('312,40 EUR');
-        if (name === 'graph') await expect(page.getByRole('button', { name: lang === 'de' ? 'Vergrößern' : 'Zoom in' })).toBeEnabled();
+        if (name === 'graph') {
+          await expect(page.getByRole('button', { name: lang === 'de' ? 'Vergrößern' : 'Zoom in' })).toBeEnabled();
+          // The fitted camera is painted on the next animation frame, after the controls become ready.
+          await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+          const canvas = await page.getByRole('img', { name: lang === 'de' ? 'Interaktives Wissensnetz' : 'Interactive knowledge graph', exact: true }).boundingBox();
+          const zoom = await page.getByRole('button', { name: lang === 'de' ? 'Vergrößern' : 'Zoom in', exact: true }).boundingBox();
+          expect(zoom!.y).toBeGreaterThanOrEqual(canvas!.y + canvas!.height);
+        }
         await assertLayout(page);
         await expect(page.locator('header')).toHaveCSS('position', 'sticky');
         if (name !== 'result' && name !== 'call') {
@@ -1136,3 +1143,59 @@ for (const lang of ['de', 'en'] as const) {
     expect(doc.analysis.amount_due).toBe('250,00 EUR');
   });
 }
+
+for (const lang of ['de', 'en'] as const) {
+  test(`completed payments become neutral while separate open deadlines remain visible in ${lang}`, async ({ page }, testInfo) => {
+    const docs = await mockApi(page, lang);
+    const doc = docs[0];
+    doc.analysis.amount_due = '250,00 EUR';
+    doc.analysis.action_items.slice(1).forEach(action => action.done = true);
+    await page.addInitScript(value => localStorage.setItem('appella.language', value), lang);
+    await page.clock.setFixedTime(new Date('2026-10-13T10:00:00Z'));
+    await page.goto(`/letters/${doc.id}`);
+    const amount = page.getByText('250,00 EUR', { exact: true });
+    await expect(amount).toHaveClass(/text-error/);
+    await page.getByRole('checkbox').first().click();
+    await expect(page.getByRole('checkbox').first()).toBeChecked();
+    await expect(amount).toHaveClass(/text-primary/);
+    await expect(amount).not.toHaveClass(/text-error|text-headline-xl-mobile/);
+    await expect(page.getByText(lang === 'de' ? 'Zahlung als erledigt markiert' : 'Payment marked complete', { exact: true })).toBeVisible();
+    await expect(page.getByText(lang === 'de' ? 'Ursprüngliche Frist' : 'Original deadline', { exact: true })).toBeVisible();
+    await expect(page.getByText(lang === 'de' ? 'Noch 23 Tage' : '23 days left', { exact: true })).not.toBeVisible();
+    await expect(page.getByText(lang === 'de' ? 'Dringend' : 'Urgent', { exact: true })).not.toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath(`payment-completed-${lang}.png`) });
+    await page.getByRole('button', { name: lang === 'de' ? 'Rückgängig' : 'Undo', exact: true }).click();
+    await expect(amount).toHaveClass(/text-error/);
+    // A call/reply due on the same date is still open: completing payment must not hide its deadline.
+    doc.analysis.action_items[0].done = true;
+    doc.analysis.action_items[2].done = false;
+    await page.reload();
+    await expect(amount).toHaveClass(/text-primary/);
+    await expect(page.getByText(lang === 'de' ? 'Noch 23 Tage' : '23 days left', { exact: true })).toBeVisible();
+    await expect(page.getByText(lang === 'de' ? 'Zahlung als erledigt markiert' : 'Payment marked complete', { exact: true })).toBeVisible();
+    expect(doc.analysis.amount_due).toBe('250,00 EUR');
+  });
+}
+
+test('double-clicking cannot zoom the page or graph, but explicit graph zoom still works', async ({ page }) => {
+  await page.goto('/graph?demo=1');
+  await expect(page.getByRole('button', { name: 'Zoom in', exact: true })).toBeEnabled();
+  await expect(page.locator('html')).toHaveCSS('touch-action', 'manipulation');
+  await expect(page.locator('body')).toHaveCSS('touch-action', 'manipulation');
+  await expect(page.locator('meta[name=viewport]')).not.toHaveAttribute('content', /user-scalable=no|maximum-scale=1/);
+  await page.evaluate(() => document.fonts.ready);
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const canvas = page.locator('canvas').first();
+  const fingerprint = () => canvas.evaluate(async element => {
+    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode((element as HTMLCanvasElement).toDataURL()));
+    return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+  });
+  const before = await fingerprint();
+  const scale = await page.evaluate(() => visualViewport?.scale ?? 1);
+  await canvas.dblclick({ position: { x: 8, y: 8 } });
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  expect(await fingerprint()).toBe(before);
+  expect(await page.evaluate(() => visualViewport?.scale ?? 1)).toBe(scale);
+  await page.getByRole('button', { name: 'Zoom in', exact: true }).click();
+  await expect.poll(fingerprint).not.toBe(before);
+});
