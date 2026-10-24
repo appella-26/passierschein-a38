@@ -5,7 +5,7 @@
   import { ApiError, getDocument } from '#lib/api.ts';
   import { deadlineLabel, formatDate } from '#lib/format.ts';
   import { language, t } from '#lib/i18n.ts';
-  import { checklist, initChecklist } from '#lib/checklist.svelte.ts';
+  import { completedActions } from '#lib/checklist.svelte.ts';
   import Card from '#lib/components/Card.svelte';
   import Button from '#lib/components/Button.svelte';
   import Icon from '#lib/components/Icon.svelte';
@@ -14,6 +14,9 @@
   import BottomSheet from '#lib/components/BottomSheet.svelte';
   import ActionChecklist from '#lib/components/ActionChecklist.svelte';
   import ReferenceChip from '#lib/components/ReferenceChip.svelte';
+  import PaymentDetails from '#lib/components/PaymentDetails.svelte';
+  import DeleteCase from '#lib/components/DeleteCase.svelte';
+  import { clearCompletedUpload } from '#lib/upload-draft.ts';
 
   let doc = $state<DocumentDetail | null>(null);
   let loading = $state(true);
@@ -28,7 +31,7 @@
   let toastTimer: ReturnType<typeof setTimeout> | undefined;
   let today = $state(new Date());
   const demo = $derived(import.meta.env.DEV && page.url.searchParams.get('demo') === '1');
-  const completed = $derived(doc ? (checklist.completed[doc.id] ?? []).filter(index => index < doc!.analysis.action_items.length) : []);
+  const completed = $derived(doc ? completedActions(doc, demo) : []);
 
   $effect(() => {
     const id = page.params.id;
@@ -37,8 +40,8 @@
     void reload;
     if (!id) return;
     const abort = new AbortController();
-    loading = true; errorKey = null; doc = null; scanOpen = false; confirmOpen = false;
-    initChecklist();
+    loading = true; errorKey = null; doc = null; scanOpen = false; confirmOpen = false; callAction = null; toast = null;
+    clearTimeout(toastTimer);
     (async () => {
       try {
         if (isDemo) {
@@ -47,7 +50,7 @@
           if (!abort.signal.aborted) doc = sample;
         } else {
           const result = await getDocument(id, abort.signal);
-          if (!abort.signal.aborted) doc = result;
+          if (!abort.signal.aborted) { doc = result; clearCompletedUpload(id); }
         }
       } catch (error) { if (!abort.signal.aborted) errorKey = error instanceof ApiError && error.status === 404 ? 'notFound' : 'error'; }
       finally { if (!abort.signal.aborted) loading = false; }
@@ -114,12 +117,14 @@
     {#if doc.analysis.references.length}
       <section class="space-y-3"><h2 class="eyebrow text-outline">{t('references')}</h2><div class="flex flex-wrap gap-2">{#each doc.analysis.references as reference, index (index)}<ReferenceChip label={reference.label} value={reference.value} oncopy={copy} />{/each}</div></section>
     {/if}
-    <ActionChecklist {doc} {completed} oncall={prepareCall} />
+    {#if doc.analysis.payment}<PaymentDetails payment={doc.analysis.payment} oncopy={copy} />{/if}
+    {#key doc.id}<ActionChecklist {doc} {completed} {demo} oncall={prepareCall} onupdate={updated => doc = updated} />{/key}
     <Card class="space-y-3"><h2 class="eyebrow text-outline">{t('related')}</h2>{#each doc.related as related (related.id)}<a href={`/letters/${encodeURIComponent(related.id)}${demo ? '?demo=1' : ''}`} class="flex min-h-12 items-center justify-between gap-3 rounded-xl bg-surface-container-low p-3 text-primary"><Icon name="document" size={22} class="shrink-0" /><div class="min-w-0 flex-1"><p class="text-label-md">{related.document_type}</p><p class="mt-1 text-body-sm text-on-surface-variant">{related.shared}</p></div><Icon name="arrow" size={20} class="shrink-0" /></a>{:else}<p class="text-body-sm text-outline">{t('noRelated')}</p>{/each}</Card>
     <div class="space-y-3">
       <div class="grid gap-3 sm:grid-cols-2"><Button variant="secondary" onclick={() => { scanPage = 1; scanOpen = true; }}><Icon name="scan" />{t('original')}</Button><a href={'/archive' + (demo ? '?demo=1' : '')} class="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-surface-container px-4 text-label-lg text-on-surface-variant"><Icon name="folder" />{t('backToArchive')}</a></div>
       <p class="text-center text-[12px] leading-5 text-outline">{t('alreadyArchived')}</p>
       <p class="mx-auto max-w-prose text-center text-[12px] leading-5 text-outline">{t('analysisLanguage')}</p>
+      {#if !demo && doc.case_id}{#key doc.case_id}<DeleteCase caseId={doc.case_id} />{/key}{/if}
     </div>
   </div>
   {#if callAction}<CallConfirm bind:open={confirmOpen} {doc} action={callAction} {demo} />{/if}

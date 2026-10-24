@@ -15,8 +15,9 @@ export function geminiModelName(model: string) {
 	return model.startsWith('models/') ? model : `models/${model}`;
 }
 
+export type AnalysisErrorCode = 'configuration' | 'rate_limit' | 'invalid_response' | 'unavailable' | 'timeout';
 export class LetterAnalysisError extends Error {
-	constructor(message: string, readonly status = 502) {
+	constructor(message: string, readonly status = 502, readonly code: AnalysisErrorCode = 'invalid_response', readonly retryAfter: number | null = null, readonly providerStatus: number | null = null) {
 		super(message);
 		this.name = 'LetterAnalysisError';
 	}
@@ -174,7 +175,37 @@ export function toE164(raw: string, defaultCountry = '49'): string | null {
 
 const nul = (s: string | undefined | null) => (s && s.trim() ? s.trim() : null);
 
+// Check types before normalization: malformed JSON shapes must not masquerade as API-key errors.
+function validField(value: any, schema: any): boolean {
+	if (value == null) return true; // optional/missing extraction values normalize to empty/null
+	if (schema.type === 'string') return typeof value === 'string' && (!schema.enum || schema.enum.includes(value));
+	if (schema.type === 'boolean') return typeof value === 'boolean'; // model-provided done is ignored
+	if (schema.type === 'array') return Array.isArray(value) && value.every(item => item != null && validField(item, schema.items));
+	if (schema.type === 'object') return typeof value === 'object' && !Array.isArray(value)
+		&& Object.entries(schema.properties).every(([key, field]) => validField(value[key], field));
+	return false;
+}
+
+function assertModelShape(raw: any) {
+	if (!raw || Array.isArray(raw) || typeof raw !== 'object' || !validField(raw, analysisSchema)
+		|| typeof raw.document_type !== 'string' || !raw.document_type.trim()
+		|| typeof raw.summary !== 'string' || !raw.summary.trim()
+		|| !raw.sender || typeof raw.sender.name !== 'string' || !raw.sender.name.trim()
+		|| (raw.references ?? []).some((r: any) => typeof r.label !== 'string' || typeof r.value !== 'string')
+		|| (raw.action_items ?? []).some((a: any) => typeof a.title !== 'string' || !a.title.trim() || typeof a.details !== 'string')
+		|| (raw.entities ?? []).some((e: any) => typeof e.name !== 'string' || !['person', 'organization', 'topic'].includes(e.type))) {
+		throw new LetterAnalysisError('The model returned an invalid analysis response.');
+	}
+	for (const value of [raw.letter_date, raw.deadline, ...(raw.action_items ?? []).map((a: any) => a.due)]) {
+		const date = value?.trim();
+		if (date && (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date)) || new Date(date).toISOString().slice(0, 10) !== date)) {
+			throw new LetterAnalysisError('The model returned an invalid analysis response.');
+		}
+	}
+}
+
 function normalize(raw: any): Analysis {
+	assertModelShape(raw);
 	return {
 		document_type: raw.document_type ?? '',
 		sender: {
@@ -220,6 +251,7 @@ function normalize(raw: any): Analysis {
 // ---------- Model calls ----------
 
 function parseModelJson(text: string | undefined): unknown {
+	if (text != null && typeof text !== 'string') throw new LetterAnalysisError('The model returned an invalid analysis response.');
 	const trimmed = text?.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '') ?? '';
 	if (!trimmed) throw new LetterAnalysisError('The model returned an empty response.');
 
@@ -240,7 +272,7 @@ function parseModelJson(text: string | undefined): unknown {
 
 async function analyzeWithGemini(imagesB64: string[], lang: Lang, today: string): Promise<Analysis> {
 	const apiKey = env.GEMINI_API_KEY?.trim();
-	if (!apiKey) throw new LetterAnalysisError('Gemini is not configured. Set GEMINI_API_KEY in .env.', 503);
+	if (!apiKey) throw new LetterAnalysisError('Gemini is not configured. Set GEMINI_API_KEY in .env.', 503, 'configuration');
 
 	try {
 		const ai = new GoogleGenAI({ apiKey });
@@ -254,6 +286,7 @@ async function analyzeWithGemini(imagesB64: string[], lang: Lang, today: string)
 				]
 			}],
 			config: {
+				httpOptions: { timeout: 180000 },
 				systemInstruction: systemPrompt(lang, today),
 				temperature: 0
 			}
@@ -261,41 +294,55 @@ async function analyzeWithGemini(imagesB64: string[], lang: Lang, today: string)
 		return normalize(parseModelJson(response.text));
 	} catch (cause) {
 		if (cause instanceof LetterAnalysisError) throw cause;
-		const status = typeof (cause as { status?: unknown })?.status === 'number'
-			? (cause as { status: number }).status
-			: 502;
-		if (status === 429) throw new LetterAnalysisError('Gemini is temporarily rate limited. Please try again shortly.', 429);
-		throw new LetterAnalysisError('Gemini could not analyze this letter. Check the API key and model configuration.', status >= 400 && status < 600 ? status : 502);
+		throw providerFailure('Gemini', cause);
 	}
 }
 
-async function analyzeWithOllama(imagesB64: string[], lang: Lang, today: string): Promise<Analysis> {
-	const res = await fetch(`${OLLAMA_URL}/api/chat`, {
-		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
-		body: JSON.stringify({
-			model: MODEL,
-			stream: false,
-			format: analysisSchema,
-			think: false, // faster; set true if extraction quality on tricky letters is poor
-			options: {
-				temperature: 0,
-				num_ctx: 16384 // Ollama's default context is small; images + schema need room
-			},
-			messages: [
-				{ role: 'system', content: systemPrompt(lang, today) },
-				{
-					role: 'user',
-					content: `Here ${imagesB64.length === 1 ? 'is the letter' : `are the ${imagesB64.length} pages of the letter`}. Analyze it.`,
-					images: imagesB64
-				}
-			]
-		})
-	});
+function providerFailure(provider: string, cause: unknown, status?: number): LetterAnalysisError {
+	const failure = cause as { status?: unknown; name?: string; message?: string } | null;
+	const providerStatus = status ?? (typeof failure?.status === 'number' ? failure.status : null);
+	const code = providerStatus ?? 502;
+	if (code === 429) return new LetterAnalysisError(`${provider} is temporarily rate limited. Please try again shortly.`, 429, 'rate_limit', 30, providerStatus);
+	if (code === 408 || code === 504 || ['TimeoutError', 'AbortError'].includes(failure?.name ?? '') || /timed?\s*out|timeout/i.test(failure?.message ?? '')) {
+		return new LetterAnalysisError(`${provider} did not finish the analysis in time. Please try again.`, 504, 'timeout', null, providerStatus);
+	}
+	if ([400, 401, 403, 404].includes(code)) return new LetterAnalysisError(`${provider} rejected the analysis request. Check the API key and model configuration.`, 503, 'configuration', null, providerStatus);
+	return new LetterAnalysisError(`${provider} is temporarily unavailable. Please try again later.`, 503, 'unavailable', null, providerStatus);
+}
 
-	if (!res.ok) throw new LetterAnalysisError(`Ollama ${res.status}: ${await res.text()}`, res.status);
-	const data = await res.json();
-	return normalize(parseModelJson(data.message?.content));
+async function analyzeWithOllama(imagesB64: string[], lang: Lang, today: string): Promise<Analysis> {
+	try {
+		const res = await fetch(`${OLLAMA_URL}/api/chat`, {
+			method: 'POST',
+			signal: AbortSignal.timeout(180000),
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				model: MODEL,
+				stream: false,
+				format: analysisSchema,
+				think: false, // faster; set true if extraction quality on tricky letters is poor
+				options: {
+					temperature: 0,
+					num_ctx: 16384 // Ollama's default context is small; images + schema need room
+				},
+				messages: [
+					{ role: 'system', content: systemPrompt(lang, today) },
+					{
+						role: 'user',
+						content: `Here ${imagesB64.length === 1 ? 'is the letter' : `are the ${imagesB64.length} pages of the letter`}. Analyze it.`,
+						images: imagesB64
+					}
+				]
+			})
+		});
+
+		if (!res.ok) throw providerFailure('Ollama', null, res.status);
+		const data = await res.json().catch(() => { throw new LetterAnalysisError('The model returned an invalid analysis response.'); });
+		return normalize(parseModelJson(data?.message?.content));
+	} catch (cause) {
+		if (cause instanceof LetterAnalysisError) throw cause;
+		throw providerFailure('Ollama', cause);
+	}
 }
 
 /** imagesB64: plain base64 strings (no "data:image/...;base64," prefix), one per page. */
@@ -304,5 +351,5 @@ export async function analyzeLetter(imagesB64: string[], lang: Lang): Promise<An
 	const provider = (env.GEMMA_PROVIDER ?? 'gemini').toLowerCase();
 	if (provider === 'gemini') return analyzeWithGemini(imagesB64, lang, today);
 	if (provider === 'ollama') return analyzeWithOllama(imagesB64, lang, today);
-	throw new LetterAnalysisError('GEMMA_PROVIDER must be either "gemini" or "ollama".', 503);
+	throw new LetterAnalysisError('GEMMA_PROVIDER must be either "gemini" or "ollama".', 503, 'configuration');
 }

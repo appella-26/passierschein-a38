@@ -1,12 +1,18 @@
 // Focused backend checks: a fresh temporary SQLite DB and a mocked Gemini SDK, no real API calls.
 // Run with: node scripts/check-backend.mjs
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createServer } from 'vite';
+import { sveltekit } from '@sveltejs/kit/vite';
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
 const dataDir = mkdtempSync(join(process.env.APPELLA_TEST_TMPDIR || tmpdir(), 'appella-backend-'));
+// Generated modules outside the project still need to resolve the project's dependencies.
+symlinkSync(resolve('node_modules'), join(dataDir, 'node_modules'), 'dir');
+const liveEnvPath = resolve('.svelte-kit/generated/dev/env/config.js');
+const liveEnvBefore = existsSync(liveEnvPath) ? readFileSync(liveEnvPath) : null;
 const savedEnv = { DATA_DIR: process.env.DATA_DIR, GEMMA_PROVIDER: process.env.GEMMA_PROVIDER, GEMINI_API_KEY: process.env.GEMINI_API_KEY };
 Object.assign(process.env, { DATA_DIR: dataDir, GEMMA_PROVIDER: 'gemini', GEMINI_API_KEY: 'test-key-not-a-real-secret' });
 
@@ -22,12 +28,22 @@ globalThis.__appellaTestGenai = class {
 let server;
 let backend;
 const originalFetch = globalThis.fetch;
+const liveUrl = process.env.APPELLA_LIVE_URL;
+async function liveDocuments() {
+  const response = await originalFetch(new URL('/api/documents', liveUrl), { signal: AbortSignal.timeout(10000) });
+  assert.equal(response.status, 200);
+  return response.json();
+}
 try {
+  const liveBefore = liveUrl ? await liveDocuments() : null;
   server = await createServer({
+    // Never load the normal app config: its shared generated env is watched by the live dev server.
+    configFile: false,
+    cacheDir: join(dataDir, 'vite-cache'),
     server: { middlewareMode: true, hmr: false },
     logLevel: 'error',
     ssr: { noExternal: ['@google/genai'] },
-    plugins: [{
+    plugins: [sveltekit({ outDir: join(dataDir, '.svelte-kit'), preprocess: vitePreprocess() }), {
       name: 'backend-test-genai',
       enforce: 'pre',
       resolveId(id) { if (id === '@google/genai') return '\0backend-test-genai'; },
@@ -43,6 +59,7 @@ try {
   const analyzeRoute = await server.ssrLoadModule('/src/routes/api/analyze/+server.ts');
   const todosRoute = await server.ssrLoadModule('/src/routes/api/documents/[id]/todos/[index]/+server.ts');
   const undoRoute = await server.ssrLoadModule('/src/routes/api/case-events/[id]/undo/+server.ts');
+  const caseRoute = await server.ssrLoadModule('/src/routes/api/cases/[id]/+server.ts');
   const client = await server.ssrLoadModule('/src/lib/assistant-client.ts');
   globalThis.fetch = async () => { throw new Error('Real network access is forbidden in backend checks'); };
 
@@ -196,6 +213,97 @@ try {
     console.error = savedConsoleError;
   }
   console.log('PASS hosted assistant edits/undo, cancellation and safe provider errors');
+
+  const savedErrors = console.error;
+  const safeLogs = [];
+  console.error = (...args) => safeLogs.push(args.join(' '));
+  try {
+    const countBefore = backend.listDocuments().length;
+    for (const text of ['', 'not-json', 'null', '{}', JSON.stringify({ ...raw, action_items: 'bad' }), JSON.stringify({ ...raw, keywords: [123] }), JSON.stringify({ ...raw, deadline: '2026-02-30' })]) {
+      generateContent = async () => ({ text });
+      const response = await analyzeRoute.POST({ request: new Request('http://localhost/api/analyze', { method: 'POST', body: JSON.stringify({ images: ['dGVzdA=='], lang: 'en' }) }) });
+      assert.equal(response.status, 502);
+      assert.equal((await response.json()).code, 'invalid_response');
+    }
+    for (const [cause, status, code] of [
+      [{ status: 500, message: 'secret-provider-token' }, 503, 'unavailable'],
+      [{ status: 503, message: 'secret-provider-token' }, 503, 'unavailable'],
+      [{ status: 401, message: 'secret-provider-token' }, 503, 'configuration'],
+      [{ status: 429, message: 'secret-provider-token' }, 429, 'rate_limit'],
+      [{ name: 'TimeoutError', message: 'secret-provider-token' }, 504, 'timeout'],
+      [new Error('secret-provider-token'), 503, 'unavailable']
+    ]) {
+      generateContent = async () => { throw cause; };
+      const response = await analyzeRoute.POST({ request: new Request('http://localhost/api/analyze', { method: 'POST', body: JSON.stringify({ images: ['dGVzdA=='] }) }) });
+      const body = await response.json();
+      assert.equal(response.status, status);
+      assert.equal(body.code, code);
+      assert.match(body.request_id, /^[a-f\d-]{36}$/);
+      assert.ok(!JSON.stringify(body).includes('secret-provider-token'));
+      if (code === 'rate_limit') assert.equal(response.headers.get('Retry-After'), '30');
+    }
+    assert.equal(backend.listDocuments().length, countBefore, 'failed analysis must not create letters');
+    for (const body of ['invalid-json', '{}', '{"images":[123]}']) {
+      const response = await analyzeRoute.POST({ request: new Request('http://localhost/api/analyze', { method: 'POST', body }) });
+      assert.equal(response.status, 400);
+      assert.equal((await response.json()).code, 'invalid_input');
+    }
+    generateContent = async () => ({ text: JSON.stringify(raw) });
+    backend.db.exec("CREATE TEMP TRIGGER fail_storage BEFORE INSERT ON documents BEGIN SELECT RAISE(ABORT, 'secret-storage-path'); END");
+    try {
+      const response = await analyzeRoute.POST({ request: new Request('http://localhost/api/analyze', { method: 'POST', body: '{"images":["dGVzdA=="]}' }) });
+      assert.equal(response.status, 500);
+      const body = await response.json();
+      assert.equal(body.code, 'storage');
+      assert.ok(!JSON.stringify(body).includes('secret-storage-path'));
+    } finally { backend.db.exec('DROP TRIGGER fail_storage'); }
+    assert.ok(safeLogs.every(line => !/secret-provider-token|secret-storage-path/.test(line)));
+  } finally { console.error = savedErrors; }
+  console.log('PASS analysis shape validation, transient/configuration errors, timeouts and safe storage failures');
+
+  const deletionAnalysis = { ...analysis, references: [{ label: 'Test reference', value: 'DELETE-CASE-REF' }] };
+  const deleteFirst = await backend.saveDocument(['dGVzdA=='], deletionAnalysis, 'en');
+  const deleteSecond = await backend.saveDocument(['dGVzdA=='], deletionAnalysis, 'en');
+  const keep = await backend.saveDocument(['dGVzdA=='], { ...analysis, references: [{ label: 'Keep', value: 'KEEP-CASE-REF' }] }, 'en');
+  const movedOut = cases.moveLetter(deleteFirst.id, keep.caseId, 'user');
+  cases.moveLetter(deleteFirst.id, deleteFirst.caseId, 'user');
+  const ids = [deleteFirst.id, deleteSecond.id];
+  const deletionRequest = body => caseRoute.DELETE({ params: { id: deleteFirst.caseId }, request: new Request('http://localhost/api/cases/delete', { method: 'DELETE', body: JSON.stringify(body) }) });
+  for (const body of [{}, { letter_ids: [123] }, { letter_ids: [deleteFirst.id, deleteFirst.id] }]) {
+    await assert.rejects(() => deletionRequest(body), error => error.status === 400);
+  }
+  await assert.rejects(() => deletionRequest({ letter_ids: [deleteFirst.id] }), error => error.status === 409);
+  assert.ok(ids.every(id => existsSync(join(backend.UPLOAD_DIR, id, 'page-1.jpg'))));
+  backend.db.exec(`CREATE TEMP TRIGGER fail_delete BEFORE DELETE ON cases WHEN OLD.id = '${deleteFirst.caseId}' BEGIN SELECT RAISE(ABORT, 'forced rollback'); END`);
+  console.error = () => {};
+  try {
+    await assert.rejects(() => deletionRequest({ letter_ids: ids }), error => error.status === 500);
+    assert.ok(ids.every(id => backend.getDocument(id) && existsSync(join(backend.UPLOAD_DIR, id, 'page-1.jpg'))), 'rollback must restore scans and database records');
+  } finally { backend.db.exec('DROP TRIGGER fail_delete'); console.error = savedErrors; }
+  const deletedResponse = await deletionRequest({ letter_ids: ids });
+  assert.equal(deletedResponse.status, 200);
+  const deleted = await deletedResponse.json();
+  assert.deepEqual(deleted.deleted_letters.sort(), ids.sort());
+  assert.equal(deleted.cleanup_pending, false);
+  assert.equal(cases.getCaseRow(deleteFirst.caseId), null);
+  for (const id of ids) {
+    assert.equal(backend.getDocument(id), null);
+    assert.equal(existsSync(join(backend.UPLOAD_DIR, id)), false);
+    assert.equal(backend.db.prepare('SELECT COUNT(*) AS n FROM docs_fts WHERE doc_id = ?').get(id).n, 0);
+    assert.ok(!backend.getGraph().nodes.some(node => node.id === `doc:${id}`));
+  }
+  assert.equal(backend.db.prepare('SELECT COUNT(*) AS n FROM case_events WHERE case_id = ?').get(deleteFirst.caseId).n, 0);
+  assert.equal(cases.getCase(keep.caseId).events.find(event => event.id === movedOut.event_id).undoable, 0);
+  assert.ok(backend.getDocument(keep.id));
+  assert.ok(existsSync(join(backend.UPLOAD_DIR, keep.id, 'page-1.jpg')));
+  assert.ok(backend.getGraph().nodes.some(node => node.label === analysis.sender.name), 'shared graph entities must remain');
+  assert.deepEqual(backend.db.prepare('PRAGMA foreign_key_check').all(), []);
+  assert.ok((await backend.search('tax')).every(doc => !ids.includes(doc.id)));
+  await assert.rejects(() => deletionRequest({ letter_ids: ids }), error => error.status === 404);
+  console.log('PASS confirmed whole-case deletion, scan/DB rollback, search/graph cleanup and unrelated case preservation');
+  assert.deepEqual(existsSync(liveEnvPath) ? readFileSync(liveEnvPath) : null, liveEnvBefore, 'backend checks must not rewrite the live generated environment');
+  if (liveUrl) assert.deepEqual(await liveDocuments(), liveBefore, 'the running app must keep serving its own database');
+  console.log('PASS generated configuration isolation' + (liveUrl ? ' alongside the live dev server' : ''));
 } finally {
   globalThis.fetch = originalFetch;
   backend?.db.close();

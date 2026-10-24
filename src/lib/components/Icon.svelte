@@ -1,5 +1,5 @@
 <script lang="ts">
-  export type IconName = 'arrow' | 'back' | 'close' | 'camera' | 'scan' | 'folder' | 'graph' | 'user' | 'sun' | 'check' | 'lock' | 'phone' | 'headset' | 'clock' | 'calendar' | 'bank' | 'copy' | 'tag' | 'bulb' | 'list' | 'document' | 'plus' | 'search' | 'warning' | 'leaf' | 'volume' | 'voicemail' | 'minus' | 'info';
+  export type IconName = 'arrow' | 'back' | 'close' | 'camera' | 'scan' | 'folder' | 'graph' | 'user' | 'sun' | 'check' | 'lock' | 'phone' | 'headset' | 'clock' | 'calendar' | 'bank' | 'copy' | 'tag' | 'bulb' | 'list' | 'document' | 'plus' | 'search' | 'warning' | 'leaf' | 'volume' | 'voicemail' | 'minus' | 'info' | 'trash';
   let { name, size = 20, class: className = '' }: { name: IconName; size?: number; class?: string } = $props();
   const paths: Record<IconName, string> = {
     arrow: 'M5 12h14m-6-6 6 6-6 6', back: 'M19 12H5m6-6-6 6 6 6', close: 'm6 6 12 12M6 18 18 6',
@@ -22,7 +22,8 @@
     warning: 'm12 3 10 18H2L12 3Zm0 6v5m0 3v1', leaf: 'M20 3C8 3 3 8 5 15c7 6 16 0 15-12ZM5 21l10-12',
     volume: 'M3 9h4l5-5v16l-5-5H3V9Zm13-1a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14',
     voicemail: 'M9 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Zm14 0a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM5 16h14',
-    minus: 'M5 12h14', info: 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM12 11v6m0-10v1'
+    minus: 'M5 12h14', info: 'M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM12 11v6m0-10v1',
+    trash: 'M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7'
   };
 </script>
 

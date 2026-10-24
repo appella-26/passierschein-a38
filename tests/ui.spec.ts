@@ -3,6 +3,7 @@ import { getMockDocuments, mockDocuments, mockRows, mockGraph } from '../src/lib
 
 const sample = mockDocuments[0];
 const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=', 'base64');
+const draftKey = 'appella.upload-draft';
 
 /** setInputFiles before hydration fires a change event no handler hears, so retry until the page lists it. */
 async function addPage(page: Page, listed: string, name = 'sample.png') {
@@ -13,33 +14,62 @@ async function addPage(page: Page, listed: string, name = 'sample.png') {
 }
 
 async function mockApi(page: Page, lang: 'de' | 'en' = 'de') {
-  await page.route('**/api/documents*', route => route.fulfill({ json: mockRows(new URL(route.request().url()).searchParams.get('q') ?? '', lang) }));
+  const documents = structuredClone(getMockDocuments(lang));
+  const changes = new Map<number, { id: string; index: number; before: boolean }>();
+  let eventId = 0;
+  await page.route('**/api/documents*', route => {
+    const rows = mockRows(new URL(route.request().url()).searchParams.get('q') ?? '', lang).flatMap(row => {
+      const doc = documents.find(item => item.id === row.id);
+      if (!doc) return [];
+      const { analysis: _analysis, related: _related, case: _case, ...current } = doc;
+      return [current];
+    });
+    return route.fulfill({ json: rows });
+  });
   await page.route('**/api/documents/*', route => {
     const id = new URL(route.request().url()).pathname.split('/').at(-1);
-    const doc = getMockDocuments(lang).find(item => item.id === id);
+    const doc = documents.find(item => item.id === id);
     return route.fulfill({ status: doc ? 200 : 404, json: doc ?? {} });
   });
   await page.route('**/api/documents/*/pages/*', route => route.fulfill({ contentType: 'image/png', body: tinyPng }));
+  await page.route('**/api/documents/*/todos/*', route => {
+    const parts = new URL(route.request().url()).pathname.split('/');
+    const id = parts[3], index = Number(parts[5]);
+    const doc = documents.find(item => item.id === id);
+    if (!doc || !doc.analysis.action_items[index]) return route.fulfill({ status: 404, json: {} });
+    changes.set(++eventId, { id, index, before: !!doc.analysis.action_items[index].done });
+    doc.analysis.action_items[index].done = route.request().postDataJSON().done;
+    return route.fulfill({ json: { event_id: eventId, case_id: 'test-case', summary: 'To-do updated' } });
+  });
+  await page.route('**/api/case-events/*/undo', route => {
+    const id = Number(new URL(route.request().url()).pathname.split('/')[3]);
+    const change = changes.get(id);
+    if (!change) return route.fulfill({ status: 400, json: {} });
+    documents.find(doc => doc.id === change.id)!.analysis.action_items[change.index].done = change.before;
+    changes.delete(id);
+    return route.fulfill({ json: { event_id: ++eventId, case_id: 'test-case', summary: 'Undone' } });
+  });
   await page.route('**/api/graph', route => route.fulfill({ json: mockGraph(lang) }));
+  return documents;
 }
 
 const workflowCopy = {
   en: {
     pages: 'Your pages (1)', analyzeOne: 'Explain this page', analyzing: 'Reading your letter…', analysisError: 'We couldn’t finish reading this letter.',
-    cancelAnalysis: 'Back to your pages', capture: 'Add a letter', completeAction: 'Mark as complete:', copyReference: 'Copy Steuernummer', copied: 'Copied. One less thing to type.',
+    cancelAnalysis: 'Back to your pages', capture: 'Your letter', completeAction: 'Mark as complete:', copyReference: 'Copy Steuernummer', copied: 'Copied. One less thing to type.',
     waitForMe: 'Hold the line for me', startCall: 'Start the call', phone: 'Phone number', dialing: 'Dialling…', ivr: 'Working through the phone menu',
     waitingTime: 'Time on hold', humanTitle: 'You’re up.', connected: 'You’re connected', voicemail: 'Voicemail reached', cancelCall: 'End call', ended: 'Call ended', failed: 'Call failed',
     taxOffice: /^Tax office/, all: /^All letters/, noResults: 'Nothing turned up.', resetFilters: 'Clear search & filters', zoomIn: 'Zoom in', connections: '2 linked letters',
-    previewAnalysis: 'See how it works', demoCallState: 'Try a call status',
+    previewAnalysis: 'See how it works', demoCallState: 'Try a call status', callNotConfigured: 'The on-hold assistant isn’t set up yet.',
     other: { button: 'Deutsch', todos: 'Ihre To-Dos', original: 'Original-Scan ansehen', page2: 'Seite 2', originalPage2: 'Original-Scan · Seite 2' }
   },
   de: {
     pages: 'Erfasste Seiten (1)', analyzeOne: '1 Seite jetzt analysieren', analyzing: 'Analyse läuft', analysisError: 'Die Analyse ist fehlgeschlagen.',
-    cancelAnalysis: 'Zur Erfassung zurück', capture: 'Brief erfassen', completeAction: 'Als erledigt markieren:', copyReference: 'Steuernummer kopieren', copied: 'In die Zwischenablage kopiert',
+    cancelAnalysis: 'Zur Erfassung zurück', capture: 'Ihr Brief', completeAction: 'Als erledigt markieren:', copyReference: 'Steuernummer kopieren', copied: 'In die Zwischenablage kopiert',
     waitForMe: 'In der Warteschleife warten', startCall: 'Anruf starten & Warteschleife übergeben', phone: 'Rufnummer', dialing: 'Nummer wird gewählt', ivr: 'Telefonmenü wird durchlaufen',
     waitingTime: 'Zeit in der Warteschleife', humanTitle: 'Jemand ist für Sie da.', connected: 'Sie sind verbunden', voicemail: 'Anrufbeantworter erreicht', cancelCall: 'Anruf beenden', ended: 'Anruf beendet', failed: 'Anruf fehlgeschlagen',
     taxOffice: /^Finanzamt/, all: /^Alle/, noResults: 'Keine Briefe gefunden', resetFilters: 'Filter zurücksetzen', zoomIn: 'Vergrößern', connections: '2 verknüpfte Briefe',
-    previewAnalysis: 'Analyse-Vorschau', demoCallState: 'Demo-Anrufstatus',
+    previewAnalysis: 'Analyse-Vorschau', demoCallState: 'Demo-Anrufstatus', callNotConfigured: 'Der Telefon-Assistent ist noch nicht eingerichtet.',
     other: { button: 'English', todos: 'Your next steps', original: 'See the original', page2: 'Page 2', originalPage2: 'Original letter · Page 2' }
   }
 } as const;
@@ -76,14 +106,15 @@ test('upload resizes images, shows analysis, and navigates to a result', async (
   await expect(page.getByRole('heading', { name: sample.document_type, exact: true })).toBeVisible();
 });
 
-test('language and checklist persist, clipboard and original scans work', async ({ page, context }) => {
+test('language and server checklist persist, clipboard and original scans work', async ({ page, context }) => {
   await mockApi(page, lang);
   await context.grantPermissions(['clipboard-read', 'clipboard-write']);
   await page.goto(`/letters/${sample.id}`);
   const check = page.getByRole('checkbox', { name: `${ui.completeAction} ${sample.analysis.action_items[0].title}` });
-  await check.check();
+  await check.click();
+  await expect(check).toBeChecked();
   await page.getByRole('button', { name: ui.copyReference }).click();
-  await expect(page.getByRole('status')).toHaveText(ui.copied);
+  await expect(page.getByRole('status').filter({ hasText: ui.copied })).toBeVisible();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe('37 012 345 67');
   await page.getByRole('button', { name: ui.other.button, exact: true }).click();
   await expect(page.getByRole('heading', { name: ui.other.todos })).toBeVisible();
@@ -145,15 +176,15 @@ test('call confirmation sends only reviewed metadata and requires consent', asyn
 });
 
 test('call confirmation explains when the phone assistant is not set up', async ({ page }) => {
-  await mockApi(page);
+  await mockApi(page, lang);
   await page.route('**/api/calls', route => route.fulfill({ status: 503, json: { message: 'ElevenLabs is not configured.', missing: ['ELEVENLABS_PHONE_NUMBER_ID'] } }));
   await page.goto(`/letters/${sample.id}`);
-  await page.getByRole('button', { name: 'In der Warteschleife warten', exact: true }).click();
+  await page.getByRole('button', { name: ui.waitForMe, exact: true }).click();
   const sheet = page.getByRole('dialog');
-  await sheet.getByLabel('Rufnummer', { exact: true }).fill('0621 / 292-0');
+  await sheet.getByLabel(ui.phone, { exact: true }).fill('0621 / 292-0');
   await sheet.getByRole('checkbox').check();
-  await sheet.getByRole('button', { name: 'Anruf starten & Warteschleife übergeben', exact: true }).click();
-  await expect(sheet.getByRole('alert')).toContainText('Der Telefon-Assistent ist noch nicht eingerichtet.');
+  await sheet.getByRole('button', { name: ui.startCall, exact: true }).click();
+  await expect(sheet.getByRole('alert')).toContainText(ui.callNotConfigured);
   await expect(page).toHaveURL(`/letters/${sample.id}`);
 });
 
@@ -481,3 +512,591 @@ test('chat helper follows the UI language and has English fallback labels', asyn
   expect(result.errors[0].message).toBe('We couldn’t reach the assistant (error 503). Try again.');
   expect(result.refs.filter((ref: { kind: string }) => ref.kind !== 'text').map((ref: { label: string }) => ref.label)).toEqual(['Letter', 'Case']);
 });
+
+// Real SvelteKit navigation, not a full reload: catches state retained after a query-only change.
+async function navigateInApp(page: Page, href: string) {
+  await page.evaluate(url => {
+    const link = document.createElement('a');
+    link.href = url; link.textContent = 'Test navigation'; link.dataset.testNavigation = 'true';
+    link.style.cssText = 'position:fixed;top:0;left:0;z-index:9999;background:white';
+    document.body.append(link);
+  }, href);
+  await page.locator('[data-test-navigation]').click();
+  await expect(page).toHaveURL(href);
+  await page.locator('[data-test-navigation]').evaluate(link => link.remove());
+}
+
+test('checklists confirm saves, retry failed Undo, and refresh archive completion', async ({ page }) => {
+  const documents = await mockApi(page, 'en');
+  const doc = documents[0];
+  doc.analysis.action_items.slice(1).forEach(action => action.done = true);
+  let finish!: () => void;
+  const waiting = new Promise<void>(resolve => finish = resolve);
+  await page.route('**/api/documents/*/todos/0', async route => {
+    expect(route.request().method()).toBe('PATCH');
+    expect(route.request().postDataJSON()).toEqual({ done: true });
+    await waiting;
+    doc.analysis.action_items[0].done = true;
+    await route.fulfill({ json: { event_id: 42, case_id: 'test-case', summary: 'Updated' } });
+  });
+  await page.goto(`/letters/${doc.id}`);
+  const check = page.getByRole('checkbox').first();
+  await check.click();
+  await expect(check).not.toBeChecked();
+  await expect(check).toBeDisabled();
+  await expect(page.getByText('Saving…', { exact: true })).toBeVisible();
+  finish();
+  await expect(check).toBeChecked();
+  await expect(check).toBeEnabled();
+  await page.route('**/api/case-events/42/undo', route => route.fulfill({ status: 409, json: { message: 'secret-provider-token' } }));
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('couldn’t undo');
+  await expect(check).toBeChecked();
+  await expect(page.locator('body')).not.toContainText('secret-provider-token');
+  await page.route('**/api/case-events/42/undo', route => {
+    doc.analysis.action_items[0].done = false;
+    return route.fulfill({ json: { event_id: 43, case_id: 'test-case', summary: 'Undone' } });
+  });
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(check).not.toBeChecked();
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).not.toBeVisible();
+  await page.reload();
+  await expect(check).not.toBeChecked();
+  await check.click();
+  await expect(check).toBeChecked();
+  await expect(check).toBeEnabled();
+  await page.getByRole('link', { name: 'Open archive', exact: true }).click();
+  await page.getByRole('button', { name: /^Completed/ }).click();
+  await expect(page.locator('.letter-card')).toHaveCount(1);
+  await expect(page.locator('.letter-card')).toContainText(doc.document_type);
+  // Simulate another client/assistant changing the stored analysis; navigation must not use old cache.
+  doc.analysis.action_items[0].done = false;
+  await page.locator('.letter-card').click();
+  await expect(page.getByRole('checkbox').first()).not.toBeChecked();
+});
+
+test('failed checklist saves keep confirmed state and do not import browser checkmarks', async ({ page }) => {
+  await mockApi(page, 'en');
+  await page.addInitScript(id => localStorage.setItem('appella.checklist', JSON.stringify({ [id]: [0, 1, 2] })), sample.id);
+  await page.route('**/api/documents/*/todos/*', route => route.fulfill({ status: 503, json: { message: 'private-key' } }));
+  await page.goto(`/letters/${sample.id}`);
+  const check = page.getByRole('checkbox').first();
+  await expect(check).not.toBeChecked();
+  await check.click();
+  await expect(page.getByRole('alert')).toContainText('couldn’t save');
+  await expect(check).not.toBeChecked();
+  await expect(check).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).not.toBeVisible();
+  await expect(page.locator('body')).not.toContainText('private-key');
+  await page.unroute('**/api/documents/*/todos/*');
+  // Reinstall the mutable mock so retry is a genuine successful server-backed operation.
+  await mockApi(page, 'en');
+  await check.click();
+  await expect(check).toBeChecked();
+  await expect(page.getByText('Change saved.', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(check).not.toBeChecked();
+});
+
+test('a confirmed write survives refresh failure and retry only reloads details', async ({ page }) => {
+  const documents = await mockApi(page, 'en');
+  let patches = 0;
+  page.on('request', request => { if (request.method() === 'PATCH') patches++; });
+  await page.goto(`/letters/${sample.id}`);
+  await expect(page.getByRole('checkbox').first()).toBeVisible();
+  await page.route(`**/api/documents/${sample.id}`, route => route.fulfill({ status: 503, json: {} }));
+  await page.getByRole('checkbox').first().click();
+  await expect(page.getByRole('alert')).toContainText('Your change was saved');
+  await expect(page.getByRole('checkbox').first()).toBeChecked();
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeEnabled();
+  documents[0].analysis.action_items[1].done = true;
+  await page.unroute(`**/api/documents/${sample.id}`);
+  await page.getByRole('button', { name: 'Reload letter', exact: true }).click();
+  await expect(page.getByRole('alert')).not.toBeVisible();
+  await expect(page.getByRole('checkbox').nth(1)).toBeChecked();
+  expect(patches).toBe(1);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByRole('checkbox').first()).not.toBeChecked();
+  await expect(page.getByRole('checkbox').nth(1)).toBeChecked();
+});
+
+test('query-only demo exits reset uploads, analysis preview, archive filters and graph data', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  await page.route('**/api/documents*', route => route.fulfill({ json: [] }));
+  await page.route('**/api/graph', route => route.fulfill({ json: { nodes: [], links: [] } }));
+  await page.goto('/?demo=1');
+  await page.locator('input[type=file][multiple]').setInputFiles({ name: 'preview.png', mimeType: 'image/png', buffer: tinyPng });
+  await expect(page.getByText('Your pages (1)', { exact: true })).toBeVisible();
+  await navigateInApp(page, '/');
+  await expect(page.locator('main img')).toHaveCount(0);
+  await navigateInApp(page, '/?demo=1');
+  await page.getByRole('button', { name: 'See how it works', exact: true }).click();
+  await navigateInApp(page, '/');
+  await expect(page.getByRole('heading', { name: 'Add a letter', exact: true })).toBeVisible();
+  await expect(page.getByText('Nothing here—yet.', { exact: true })).toBeVisible();
+  await expect(page.locator('main img')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Explain my letter', exact: true })).toBeDisabled();
+  await expect(page.getByText('Just a demo', { exact: false })).not.toBeVisible();
+  await navigateInApp(page, '/archive?demo=1');
+  await page.getByRole('searchbox').fill('tax');
+  await page.getByRole('button', { name: /^Tax office/ }).click();
+  await expect(page.locator('.letter-card').first()).toBeVisible();
+  await navigateInApp(page, '/archive');
+  await expect(page.getByRole('searchbox')).toHaveValue('');
+  await expect(page.getByRole('button', { name: /^All letters/ })).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.letter-card')).toHaveCount(0);
+  await navigateInApp(page, '/graph?demo=1');
+  await expect(page.getByRole('button', { name: sample.sender_name, exact: true })).toBeVisible();
+  await page.getByRole('button', { name: sample.sender_name, exact: true }).click();
+  await navigateInApp(page, '/graph');
+  await expect(page.getByRole('heading', { name: 'The dots will connect.' })).toBeVisible();
+  await expect(page.locator('canvas')).toHaveCount(0);
+  await expect(page.getByText(sample.sender_name, { exact: true })).not.toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test('demo checklist edits stay local even when a real document has the same ID', async ({ page }) => {
+  await mockApi(page, 'en');
+  const writes: string[] = [];
+  page.on('request', request => { if (['POST', 'PATCH'].includes(request.method())) writes.push(request.url()); });
+  await page.goto('/letters/demo-tax?demo=1');
+  await page.getByRole('checkbox').first().check();
+  await expect(page.getByText('Demo checkmarks stay in this preview only.')).toBeVisible();
+  await navigateInApp(page, '/archive?demo=1');
+  await navigateInApp(page, '/letters/demo-tax?demo=1');
+  await expect(page.getByRole('checkbox').first()).toBeChecked();
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).not.toBeVisible();
+  // The Undo affordance is scoped to the current result; a new visit still retains demo completion.
+  await navigateInApp(page, '/letters/demo-tax');
+  await expect(page.getByRole('checkbox').first()).not.toBeChecked();
+  await expect(page.getByText('Your checkmarks are saved with this letter in the archive.')).toBeVisible();
+  expect(writes).toEqual([]);
+});
+
+test('demo call metadata and terminal events cannot leak into normal monitoring', async ({ page }) => {
+  await page.route('**/api/documents*', route => route.fulfill({ json: [] }));
+  await page.addInitScript(() => {
+    (window as unknown as { eventSources: string[] }).eventSources = [];
+    class FakeEventSource {
+      static CLOSED = 2; readyState = 1;
+      onmessage?: (event: { data: string }) => void; onopen?: () => void;
+      constructor(url: string) {
+        (window as unknown as { eventSources: string[] }).eventSources.push(url);
+        setTimeout(() => { this.onopen?.(); this.onmessage?.({ data: JSON.stringify({ state: 'dialing', at: new Date().toISOString() }) }); }, 20);
+      }
+      close() { this.readyState = 2; }
+    }
+    Object.defineProperty(window, 'EventSource', { value: FakeEventSource });
+    // Old leaked demo storage must never be treated as a real call context.
+    sessionStorage.setItem('appella.call', JSON.stringify({ id: 'demo-call', senderName: 'Leaked demo sender', toNumber: '+490000000', purpose: 'demo', reference: '', letterId: 'demo-tax', demo: true }));
+  });
+  await page.goto('/');
+  await expect(page.getByText('Call in progress', { exact: true })).not.toBeVisible();
+  await navigateInApp(page, '/letters/demo-tax?demo=1');
+  await page.getByRole('button', { name: 'Hold the line for me', exact: true }).click();
+  await page.getByRole('dialog').getByRole('checkbox').check();
+  await page.getByRole('button', { name: 'Start the call', exact: true }).click();
+  await page.getByLabel('Try a call status').selectOption('ended');
+  await expect(page.getByRole('heading', { name: 'Call ended', exact: true })).toBeVisible();
+  await navigateInApp(page, '/');
+  await expect(page.getByText('Call in progress', { exact: true })).not.toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { eventSources: string[] }).eventSources)).toEqual([]);
+  await navigateInApp(page, '/calls/demo-call');
+  await expect(page.getByRole('status').filter({ hasText: 'Dialling…' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Call ended', exact: true })).not.toBeVisible();
+  await expect(page.getByText(sample.sender_name, { exact: true })).not.toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { eventSources: string[] }).eventSources)).toEqual(['/api/calls/demo-call/events']);
+});
+
+test('leaving a demo restores real call metadata and monitoring without cancelling it', async ({ page }) => {
+  await page.route('**/api/documents*', route => route.fulfill({ json: [] }));
+  await page.addInitScript(() => {
+    (window as unknown as { sources: string[] }).sources = [];
+    class FakeEventSource {
+      static CLOSED = 2; readyState = 1;
+      onmessage?: (event: { data: string }) => void; onopen?: () => void;
+      constructor(url: string) {
+        (window as unknown as { sources: string[] }).sources.push(url);
+        setTimeout(() => { this.onopen?.(); this.onmessage?.({ data: JSON.stringify({ state: 'on_hold', at: new Date().toISOString() }) }); }, 20);
+      }
+      close() { this.readyState = 2; }
+    }
+    Object.defineProperty(window, 'EventSource', { value: FakeEventSource });
+    sessionStorage.setItem('appella.call', JSON.stringify({ id: 'real-call', senderName: 'Saved real sender', toNumber: '+490000000', purpose: 'synthetic', reference: '', letterId: 'real-letter' }));
+  });
+  const writes: string[] = [];
+  page.on('request', request => { if (request.method() !== 'GET') writes.push(request.url()); });
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Saved real sender', exact: true })).toBeVisible();
+  await navigateInApp(page, '/calls/demo-call?demo=1');
+  await page.getByLabel('Try a call status').selectOption('ended');
+  await navigateInApp(page, '/');
+  await expect(page.getByRole('heading', { name: 'Saved real sender', exact: true })).toBeVisible();
+  await expect(page.getByText('On hold', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { sources: string[] }).sources)).toEqual(['/api/calls/real-call/events', '/api/calls/real-call/events']);
+  expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem('appella.call')!).id)).toBe('real-call');
+  expect(writes).toEqual([]);
+});
+
+test('Undo reload failure keeps last-confirmed state until an authoritative read', async ({ page }) => {
+  const docs = await mockApi(page, 'en');
+  await page.goto(`/letters/${sample.id}`);
+  const check = page.getByRole('checkbox').first();
+  await check.click();
+  await expect(check).toBeChecked();
+  await expect(check).toBeEnabled();
+  await page.route(`**/api/documents/${sample.id}`, route => route.fulfill({ status: 503, json: {} }));
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('Your change was saved');
+  expect(docs[0].analysis.action_items[0].done).toBe(false);
+  await expect(check).toBeChecked();
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).not.toBeVisible();
+  await page.unroute(`**/api/documents/${sample.id}`);
+  await page.getByRole('button', { name: 'Reload letter', exact: true }).click();
+  await expect(check).not.toBeChecked();
+  await expect(page.getByRole('alert')).not.toBeVisible();
+});
+
+test('a lost save response offers an authoritative reload instead of inventing completion', async ({ page }) => {
+  const docs = await mockApi(page, 'en');
+  await page.route('**/api/documents/*/todos/*', route => {
+    docs[0].analysis.action_items[0].done = true;
+    return route.abort('failed');
+  });
+  await page.goto(`/letters/${sample.id}`);
+  const check = page.getByRole('checkbox').first();
+  await check.click();
+  await expect(page.getByRole('alert')).toContainText('couldn’t save or confirm');
+  await expect(check).not.toBeChecked();
+  await page.getByRole('button', { name: 'Reload letter', exact: true }).click();
+  await expect(check).toBeChecked();
+  await expect(page.getByRole('alert')).not.toBeVisible();
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).not.toBeVisible();
+});
+
+for (const lang of ['de', 'en'] as const) {
+  test(`payment fields are copyable, safely wrap and do not initiate payment in ${lang}`, async ({ page, context }, testInfo) => {
+    const docs = await mockApi(page, lang);
+    await page.addInitScript(value => localStorage.setItem('appella.language', value), lang);
+    await page.setViewportSize({ width: 375, height: 900 });
+    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    const payment = { recipient: 'Synthetic Test Recipient ' + 'Name'.repeat(15), iban: 'DE89 3704 0044 0532 0130 00', purpose: 'TEST-REFERENCE-' + '1234567890'.repeat(8) };
+    docs[0].analysis.payment = payment;
+    const writes: string[] = [];
+    page.on('request', request => { if (request.method() !== 'GET') writes.push(request.url()); });
+    await page.goto(`/letters/${docs[0].id}`);
+    const labels = lang === 'de' ? ['Zahlungsempfänger kopieren', 'IBAN kopieren', 'Verwendungszweck kopieren'] : ['Copy Payment recipient', 'Copy IBAN', 'Copy Payment reference'];
+    for (const [index, value] of [payment.recipient, payment.iban, payment.purpose].entries()) {
+      await page.getByRole('button', { name: labels[index], exact: true }).click();
+      expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(value);
+    }
+    await assertLayout(page);
+    await page.getByRole('heading', { name: lang === 'de' ? 'Zahlungsangaben' : 'Payment details', exact: true }).evaluate(element => element.scrollIntoView({ block: 'center' }));
+    await page.screenshot({ path: testInfo.outputPath(`payment-${lang}-375.png`) });
+    expect(writes).toEqual([]);
+    docs[0].analysis.payment.iban = null;
+    await page.reload();
+    await expect(page.getByRole('button', { name: labels[1], exact: true })).not.toBeVisible();
+    await expect(page.getByText(lang === 'de' ? 'Nicht im Schreiben erkannt' : 'Not found in the letter', { exact: true })).toBeVisible();
+    await page.addInitScript(() => Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => { throw new Error('Denied'); } }, configurable: true }));
+    await page.reload();
+    await page.getByRole('button', { name: labels[0], exact: true }).click();
+    await expect(page.getByRole('status')).toContainText(lang === 'de' ? 'Kopieren nicht möglich' : 'Copying didn’t work');
+    docs[0].analysis.payment = null;
+    await page.reload();
+    await expect(page.getByRole('heading', { name: lang === 'de' ? 'Zahlungsangaben' : 'Payment details', exact: true })).not.toBeVisible();
+  });
+}
+
+const uploadFailures = [
+  { status: 503, message: 'Gemini is not configured. Set GEMINI_API_KEY in .env.', text: { en: 'isn’t set up correctly', de: 'nicht richtig konfiguriert' } },
+  { status: 401, message: 'private-api-key', text: { en: 'isn’t set up correctly', de: 'nicht richtig konfiguriert' } },
+  { status: 429, message: 'private-api-key', retry: '30', text: { en: 'limiting requests', de: 'begrenzt gerade' } },
+  { status: 502, message: 'The model returned an invalid analysis response.', text: { en: 'valid analysis', de: 'gültige Analyse' } },
+  { status: 502, message: 'The model returned an empty response.', text: { en: 'valid analysis', de: 'gültige Analyse' } },
+  { status: 503, message: 'private-api-key', text: { en: 'unavailable right now', de: 'gerade nicht erreichbar' } },
+  { status: 502, message: 'private-api-key', text: { en: 'couldn’t finish reading', de: 'Analyse ist fehlgeschlagen' } }
+];
+for (const lang of ['de', 'en'] as const) {
+  test(`upload errors are actionable, localized and never reveal provider messages in ${lang}`, async ({ page }) => {
+    await mockApi(page, lang);
+    await page.clock.install();
+    await page.addInitScript(value => localStorage.setItem('appella.language', value), lang);
+    await page.goto('/');
+    await page.locator('input[type=file][multiple]').setInputFiles({ name: 'synthetic.png', mimeType: 'image/png', buffer: tinyPng });
+    const analyze = page.getByRole('button', { name: lang === 'de' ? '1 Seite jetzt analysieren' : 'Explain this page', exact: true });
+    for (const failure of uploadFailures) {
+      await page.route('**/api/analyze', route => route.fulfill({ status: failure.status, headers: failure.retry ? { 'Retry-After': failure.retry } : {}, json: { message: failure.message } }));
+      await analyze.click();
+      await expect(page.getByRole('alert')).toContainText(failure.text[lang]);
+      await expect(page.getByRole('alert')).toContainText(lang === 'de' ? 'ausgewählten Seiten bleiben' : 'selected pages are still here');
+      await expect(page.locator('main img')).toHaveCount(1);
+      await expect(page.locator('body')).not.toContainText('private-api-key');
+      if (failure.retry) {
+        await expect(page.getByRole('alert')).toContainText('30');
+        await page.clock.fastForward(31000);
+      }
+      await page.unroute('**/api/analyze');
+    }
+    await page.route('**/api/analyze', route => route.fulfill({ status: 200, contentType: 'application/json', body: 'not-json' }));
+    await analyze.click();
+    await expect(page.getByRole('alert')).toContainText(lang === 'de' ? 'gültige Analyse' : 'valid analysis');
+    await page.unroute('**/api/analyze');
+    await page.route('**/api/analyze', route => route.abort('failed'));
+    await analyze.click();
+    await expect(page.getByRole('alert')).toContainText(lang === 'de' ? 'Verbindung zum Server' : 'connection to the server');
+    await expect(page).toHaveURL('/');
+  });
+}
+
+for (const lang of ['de', 'en'] as const) {
+  test(`subtle whole-case deletion requires review and removes all its letters in ${lang}`, async ({ page }, testInfo) => {
+    const docs = await mockApi(page, lang);
+    await page.addInitScript(value => localStorage.setItem('appella.language', value), lang);
+    await page.setViewportSize({ width: 375, height: 900 });
+    const caseId = 'delete-test-case';
+    const members = [docs[0], docs[3]];
+    const title = 'Synthetic case ' + 'Long-title-'.repeat(5);
+    members.forEach(doc => { doc.case_id = caseId; doc.case = { id: caseId, title, status: 'open' }; });
+    let deletes = 0;
+    await page.route(`**/api/cases/${caseId}`, route => {
+      if (route.request().method() !== 'DELETE') return route.fulfill({ json: { id: caseId, title, letters: members } });
+      deletes++;
+      expect(route.request().postDataJSON().letter_ids.sort()).toEqual(members.map(doc => doc.id).sort());
+      for (const member of members) docs.splice(docs.findIndex(doc => doc.id === member.id), 1);
+      return route.fulfill({ json: { id: caseId, deleted_letters: members.map(doc => doc.id), cleanup_pending: false } });
+    });
+    const labels = lang === 'de'
+      ? { option: 'Akte löschen…', confirm: 'Akte endgültig löschen', cancel: 'Abbrechen', warning: 'alle 2 zugehörigen Briefe', success: 'Die Akte und ihre Briefe wurden gelöscht.' }
+      : { option: 'Delete case…', confirm: 'Permanently delete case', cancel: 'Cancel', warning: 'all 2 linked letters', success: 'The case and its letters were deleted.' };
+    await page.goto(`/letters/${members[0].id}`);
+    const option = page.getByRole('button', { name: labels.option, exact: true });
+    await expect(option).toHaveClass(/text-outline/);
+    await option.click();
+    let sheet = page.getByRole('dialog');
+    await expect(sheet).toContainText(labels.warning);
+    await expect(sheet.locator('li')).toHaveCount(2);
+    await expect(sheet.getByRole('button', { name: labels.confirm, exact: true })).toBeDisabled();
+    await sheet.getByRole('button', { name: labels.cancel, exact: true }).click();
+    expect(deletes).toBe(0);
+    await option.click();
+    sheet = page.getByRole('dialog');
+    await expect(sheet.getByRole('checkbox')).not.toBeChecked();
+    await sheet.getByRole('checkbox').check();
+    await assertLayout(page);
+    expect(await sheet.evaluate(element => element.scrollWidth <= element.clientWidth)).toBe(true);
+    await page.screenshot({ path: testInfo.outputPath(`delete-case-${lang}-375.png`) });
+    await sheet.getByRole('button', { name: labels.confirm, exact: true }).click();
+    await expect(page).toHaveURL('/archive?deleted=1');
+    await expect(page.getByRole('status').filter({ hasText: labels.success })).toBeVisible();
+    await expect(page.locator('.letter-card')).toHaveCount(2);
+    expect(deletes).toBe(1);
+  });
+}
+
+test('case deletion handles changed membership and failures without silently deleting', async ({ page }) => {
+  const docs = await mockApi(page, 'en');
+  docs[0].case_id = 'case-delete';
+  let members = [docs[0]];
+  let outcome = 409;
+  let deletes = 0;
+  await page.route('**/api/cases/case-delete', route => {
+    if (route.request().method() !== 'DELETE') return route.fulfill({ json: { id: 'case-delete', title: 'Test case', letters: members } });
+    deletes++;
+    return route.fulfill({ status: outcome, json: { message: 'secret-server-path' } });
+  });
+  await page.goto(`/letters/${docs[0].id}`);
+  await page.getByRole('button', { name: 'Delete case…', exact: true }).click();
+  const sheet = page.getByRole('dialog');
+  await sheet.getByRole('checkbox').check();
+  members = [docs[0], docs[3]];
+  await sheet.getByRole('button', { name: 'Permanently delete case', exact: true }).click();
+  await expect(sheet.getByRole('alert')).toContainText('letters in this case have changed');
+  await expect(sheet.getByRole('button', { name: 'Permanently delete case', exact: true })).toBeDisabled();
+  await expect(page).toHaveURL(`/letters/${docs[0].id}`);
+  await sheet.getByRole('button', { name: 'Reload case', exact: true }).click();
+  await expect(sheet.locator('li')).toHaveCount(2);
+  await expect(sheet.getByRole('checkbox')).not.toBeChecked();
+  outcome = 500;
+  await sheet.getByRole('checkbox').check();
+  await sheet.getByRole('button', { name: 'Permanently delete case', exact: true }).click();
+  await expect(sheet.getByRole('alert')).toContainText('couldn’t confirm deletion');
+  await expect(page.locator('body')).not.toContainText('secret-server-path');
+  await expect(page).toHaveURL(`/letters/${docs[0].id}`);
+  expect(deletes).toBe(2);
+});
+
+test('case deletion is unavailable without a case or in demo mode', async ({ page }) => {
+  const docs = await mockApi(page, 'en');
+  await page.goto(`/letters/${docs[0].id}`);
+  await expect(page.getByRole('heading', { name: docs[0].document_type, exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Delete case…', exact: true })).not.toBeVisible();
+  docs[0].case_id = 'real-case';
+  await navigateInApp(page, '/letters/demo-tax?demo=1');
+  await expect(page.getByRole('button', { name: 'Delete case…', exact: true })).not.toBeVisible();
+});
+
+test('selected pages survive reloads and explicit discard clears the tab draft', async ({ page }) => {
+  await mockApi(page, 'en');
+  await page.goto('/');
+  await expect(page.locator('.letter-card').first()).toBeVisible();
+  await page.locator('input[type=file][multiple]').setInputFiles({ name: 'synthetic.png', mimeType: 'image/png', buffer: tinyPng });
+  await expect.poll(() => page.evaluate(key => JSON.parse(sessionStorage.getItem(key) ?? '{}').phase, draftKey)).toBe('ready');
+  await page.reload();
+  await expect(page.getByText('Your pages (1)', { exact: true })).toBeVisible();
+  await expect(page.locator('main img')).toHaveCount(1);
+  await expect(page.getByRole('button', { name: 'Explain this page', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Discard selected pages', exact: true }).click();
+  expect(await page.evaluate(key => sessionStorage.getItem(key), draftKey)).toBeNull();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Explain my letter', exact: true })).toBeDisabled();
+  await expect(page.locator('main img')).toHaveCount(0);
+});
+
+test('reload during analysis restores pages and warns instead of automatically submitting again', async ({ page }, testInfo) => {
+  await mockApi(page, 'en');
+  let calls = 0;
+  let finish!: () => void;
+  const waiting = new Promise<void>(resolve => finish = resolve);
+  await page.route('**/api/analyze', async route => {
+    calls++;
+    await waiting;
+    await route.fulfill({ json: { id: sample.id, analysis: sample.analysis, related: sample.related } }).catch(() => {});
+  });
+  await page.goto('/');
+  await expect(page.locator('.letter-card').first()).toBeVisible();
+  await page.locator('input[type=file][multiple]').setInputFiles({ name: 'synthetic.png', mimeType: 'image/png', buffer: tinyPng });
+  await page.getByRole('button', { name: 'Explain this page', exact: true }).click();
+  await expect.poll(() => calls).toBe(1);
+  await expect.poll(() => page.evaluate(key => JSON.parse(sessionStorage.getItem(key) ?? '{}').phase, draftKey)).toBe('sending');
+  await page.reload();
+  finish();
+  await expect(page.getByRole('alert')).toContainText('interrupted the analysis');
+  await expect(page.getByRole('alert')).toContainText('Nothing will be resubmitted automatically');
+  await expect(page.getByText('Your pages (1)', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Check the archive first', exact: true })).toBeVisible();
+  const retry = await page.getByRole('button', { name: 'Explain this page', exact: true }).boundingBox();
+  const nav = await page.locator('nav').boundingBox();
+  expect(retry!.y + retry!.height).toBeLessThan(nav!.y);
+  await expect(page).toHaveURL('/');
+  expect(calls).toBe(1);
+  await page.screenshot({ path: testInfo.outputPath('interrupted-upload-390.png'), fullPage: true });
+});
+
+test('structured analysis errors and safe request references survive reloads', async ({ page }) => {
+  await mockApi(page, 'en');
+  const requestId = 'd2766911-7c22-4819-9bb0-80973564a6d3';
+  await page.route('**/api/analyze', route => route.fulfill({ status: 503, json: { code: 'unavailable', message: 'secret-key-and-provider-body', request_id: requestId } }));
+  await page.goto('/');
+  await expect(page.locator('.letter-card').first()).toBeVisible();
+  await page.locator('input[type=file][multiple]').setInputFiles({ name: 'synthetic.png', mimeType: 'image/png', buffer: tinyPng });
+  await page.getByRole('button', { name: 'Explain this page', exact: true }).click();
+  await expect(page.getByRole('alert')).toContainText('unavailable right now');
+  await expect(page.getByRole('alert')).toContainText(requestId);
+  await expect.poll(() => page.evaluate(key => JSON.parse(sessionStorage.getItem(key) ?? '{}').phase, draftKey)).toBe('error');
+  await page.reload();
+  await expect(page.getByRole('alert')).toContainText('unavailable right now');
+  await expect(page.getByRole('alert')).toContainText(requestId);
+  await expect(page.locator('body')).not.toContainText('secret-key-and-provider-body');
+  await expect(page.getByText('Your pages (1)', { exact: true })).toBeVisible();
+});
+
+test('a saved result remains accessible after a failed detail load without another analysis', async ({ page }) => {
+  await mockApi(page, 'en');
+  let calls = 0;
+  await page.route('**/api/analyze', route => { calls++; return route.fulfill({ json: { id: sample.id, analysis: sample.analysis, related: sample.related } }); });
+  await page.route(`**/api/documents/${sample.id}`, route => route.fulfill({ status: 503, json: {} }));
+  await page.goto('/');
+  await expect(page.locator('.letter-card').first()).toBeVisible();
+  await page.locator('input[type=file][multiple]').setInputFiles({ name: 'synthetic.png', mimeType: 'image/png', buffer: tinyPng });
+  await page.getByRole('button', { name: 'Explain this page', exact: true }).click();
+  await expect(page).toHaveURL(`/letters/${sample.id}`);
+  await expect(page.getByRole('button', { name: 'Try again', exact: true })).toBeVisible();
+  expect(await page.evaluate(key => JSON.parse(sessionStorage.getItem(key)!).resultId, draftKey)).toBe(sample.id);
+  await navigateInApp(page, '/');
+  await expect(page.getByRole('alert')).toContainText('analysis was saved');
+  await expect(page.getByRole('link', { name: 'Open saved result', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Explain this page', exact: true })).not.toBeVisible();
+  await page.unroute(`**/api/documents/${sample.id}`);
+  await page.getByRole('link', { name: 'Open saved result', exact: true }).click();
+  await expect(page).toHaveURL(`/letters/${sample.id}`);
+  await expect(page.getByRole('heading', { name: getMockDocuments('en')[0].document_type, exact: true })).toBeVisible();
+  await expect.poll(() => page.evaluate(key => sessionStorage.getItem(key), draftKey)).toBeNull();
+  expect(calls).toBe(1);
+});
+
+test('rate limits enforce a retry cooldown without automatically calling the provider', async ({ page }) => {
+  await mockApi(page, 'en');
+  await page.clock.install();
+  let calls = 0;
+  await page.route('**/api/analyze', route => { calls++; return route.fulfill({ status: 429, headers: { 'Retry-After': '30' }, json: { code: 'rate_limit', message: 'safe' } }); });
+  await page.goto('/');
+  await expect(page.locator('.letter-card').first()).toBeVisible();
+  await page.locator('input[type=file][multiple]').setInputFiles({ name: 'synthetic.png', mimeType: 'image/png', buffer: tinyPng });
+  await page.getByRole('button', { name: 'Explain this page', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Retry in 30s', exact: true })).toBeDisabled();
+  await page.clock.fastForward(31000);
+  await expect(page.getByRole('button', { name: 'Explain this page', exact: true })).toBeEnabled();
+  expect(calls).toBe(1);
+});
+
+test('recovery storage failures are visible and demo captures cannot replace a real draft', async ({ page }) => {
+  await mockApi(page, 'en');
+  await page.goto('/');
+  await expect(page.locator('.letter-card').first()).toBeVisible();
+  await page.locator('input[type=file][multiple]').setInputFiles({ name: 'real-synthetic.png', mimeType: 'image/png', buffer: tinyPng });
+  await expect.poll(() => page.evaluate(key => JSON.parse(sessionStorage.getItem(key) ?? '{}').pages?.[0]?.name, draftKey)).toBe('real-synthetic.png');
+  await navigateInApp(page, '/?demo=1');
+  await page.locator('input[type=file][multiple]').setInputFiles([
+    { name: 'demo-1.png', mimeType: 'image/png', buffer: tinyPng },
+    { name: 'demo-2.png', mimeType: 'image/png', buffer: tinyPng }
+  ]);
+  await expect(page.getByText('Your pages (2)', { exact: true })).toBeVisible();
+  await navigateInApp(page, '/');
+  await expect(page.getByText('Your pages (1)', { exact: true })).toBeVisible();
+  expect(await page.evaluate(key => JSON.parse(sessionStorage.getItem(key)!).pages[0].name, draftKey)).toBe('real-synthetic.png');
+  await page.getByRole('button', { name: 'Discard selected pages', exact: true }).click();
+  await page.evaluate(key => {
+    const set = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (name, value) { if (name === key) throw new DOMException('Quota exceeded', 'QuotaExceededError'); return set.call(this, name, value); };
+  }, draftKey);
+  await page.locator('input[type=file][multiple]').setInputFiles({ name: 'synthetic.png', mimeType: 'image/png', buffer: tinyPng });
+  await expect(page.getByRole('status').filter({ hasText: 'reload recovery is unavailable' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Explain this page', exact: true })).toBeEnabled();
+});
+
+for (const lang of ['de', 'en'] as const) {
+  test(`uploaded-page UI stays focused and keeps technical notices collapsed in ${lang}`, async ({ page }, testInfo) => {
+    await mockApi(page, lang);
+    await page.addInitScript(value => localStorage.setItem('appella.language', value), lang);
+    await page.goto('/');
+    await expect(page.locator('.letter-card').first()).toBeVisible();
+    await page.locator('input[type=file][multiple]').setInputFiles({ name: 'synthetic.png', mimeType: 'image/png', buffer: tinyPng });
+    const explain = page.getByRole('button', { name: lang === 'de' ? '1 Seite jetzt analysieren' : 'Explain this page', exact: true });
+    await expect(explain).toBeEnabled();
+    await expect(page.locator('.letter-card')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: lang === 'de' ? 'Kamera öffnen' : 'Take a photo', exact: true })).not.toBeVisible();
+    await expect(page.getByRole('button', { name: lang === 'de' ? 'Bilder auswählen' : 'Choose images', exact: true })).not.toBeVisible();
+    await expect(page.getByRole('status')).not.toBeVisible();
+    await expect(page.getByRole('alert')).not.toBeVisible();
+    const info = page.locator('details').filter({ hasText: lang === 'de' ? 'Über diesen Upload' : 'About this upload' });
+    await expect(info).not.toHaveAttribute('open');
+    await expect(info.locator('div')).not.toBeVisible();
+    await assertLayout(page);
+    const bounds = await explain.boundingBox();
+    const nav = await page.locator('nav').boundingBox();
+    expect(bounds!.y + bounds!.height).toBeLessThan(nav!.y);
+    await page.screenshot({ path: testInfo.outputPath(`focused-upload-${lang}-390.png`) });
+    await page.route('**/api/analyze', route => route.fulfill({ status: 503, json: { code: 'configuration', message: 'private-key', request_id: 'd2766911-7c22-4819-9bb0-80973564a6d3' } }));
+    await explain.click();
+    const error = page.getByRole('alert');
+    await expect(error.locator(':scope > p')).toHaveText(lang === 'de' ? 'Der KI-Dienst muss eingerichtet werden.' : 'Your AI service needs setting up.');
+    await expect(error.locator('details')).not.toHaveAttribute('open');
+    await expect(error.locator('details > div')).not.toBeVisible();
+    await expect(page.locator('body')).not.toContainText('private-key');
+    await error.locator('summary').click();
+    await expect(error.locator('details > div')).toBeVisible();
+    await expect(error).toContainText('GEMMA_PROVIDER');
+  });
+}

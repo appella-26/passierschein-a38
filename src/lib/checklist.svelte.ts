@@ -1,24 +1,21 @@
-export const checklist = $state({ completed: {} as Record<string, number[]>, ready: false });
+import type { DocumentDetail } from '#lib/types.ts';
 
-export function initChecklist() {
-  if (checklist.ready) return;
-  try {
-    const value: unknown = JSON.parse(localStorage.getItem('appella.checklist') ?? '{}');
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-      for (const [id, entries] of Object.entries(value)) {
-        if (Array.isArray(entries)) checklist.completed[id] = entries.filter((entry): entry is number => Number.isInteger(entry) && entry >= 0);
-      }
-    }
-  } catch { /* An unavailable or invalid storage entry must not prevent reading a letter. */ }
-  checklist.ready = true;
+// Preview-only session state. Real completion always comes from analysis.action_items[].done.
+export const demoChecklist = $state({ completed: {} as Record<string, number[]> });
+
+export function resetDemoChecklist() { demoChecklist.completed = {}; }
+
+export function setDemoCompleted(doc: DocumentDetail, index: number, complete: boolean) {
+  const existing = completedActions(doc, true);
+  demoChecklist.completed[doc.id] = complete ? [...new Set([...existing, index])] : existing.filter(item => item !== index);
 }
 
-export function setCompleted(id: string, index: number, complete: boolean) {
-  const existing = checklist.completed[id] ?? [];
-  checklist.completed[id] = complete ? [...new Set([...existing, index])] : existing.filter(item => item !== index);
-  try { localStorage.setItem('appella.checklist', JSON.stringify(checklist.completed)); } catch { /* Session-only state still works. */ }
+export function completedActions(doc: DocumentDetail, demo = false): number[] {
+  return demo && demoChecklist.completed[doc.id]
+    ? demoChecklist.completed[doc.id].filter(index => index < doc.analysis.action_items.length)
+    : doc.analysis.action_items.flatMap((action, index) => action.done ? [index] : []);
 }
 
-export function isDocumentDone(id: string, actionCount: number) {
-  return actionCount > 0 && (checklist.completed[id] ?? []).filter(index => index < actionCount).length === actionCount;
+export function isDocumentDone(doc: DocumentDetail, demo = false) {
+  return doc.analysis.action_items.length > 0 && completedActions(doc, demo).length === doc.analysis.action_items.length;
 }
