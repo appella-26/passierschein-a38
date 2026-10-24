@@ -2,7 +2,7 @@
   import { goto } from '$app/navigation';
   import type { ActionItem, DocumentDetail, CallState } from '#lib/types.ts';
   import { t } from '#lib/i18n.ts';
-  import { post } from '#lib/api.ts';
+  import { ApiError, post } from '#lib/api.ts';
   import { phoneToE164 } from '#lib/format.ts';
   import { saveCallContext } from '#lib/call-session.svelte.ts';
   import { enableSound } from '#lib/notifications.svelte.ts';
@@ -15,7 +15,7 @@
   let purpose = $state('');
   let consent = $state(false);
   let pending = $state(false);
-  let failed = $state(false);
+  let failed = $state<'error' | 'callNotConfigured' | false>(false);
   const normalized = $derived(phoneToE164(number));
   const reference = $derived(doc.analysis.references.map(item => `${item.label}: ${item.value}`).join(' · '));
   $effect(() => { if (open) { number = action.phone_raw ?? action.phone ?? ''; purpose = action.call_purpose_de ?? ''; consent = false; failed = false; } });
@@ -31,7 +31,7 @@
       saveCallContext({ id: result.id, ...input, letterId: doc.id, demo });
       open = false;
       await goto(`/calls/${encodeURIComponent(result.id)}${demo ? '?demo=1' : ''}`);
-    } catch { failed = true; }
+    } catch (error) { failed = error instanceof ApiError && error.status === 503 ? 'callNotConfigured' : 'error'; }
     finally { pending = false; }
   }
 </script>
@@ -59,7 +59,7 @@
     <div class="rounded-xl border border-primary/10 bg-primary/5 p-4"><h3 class="mb-3 flex items-center gap-2 text-label-lg text-primary"><Icon name="info" size={18} />{t('howCallWorks')}</h3><ol class="space-y-2.5">{#each ['callStep1', 'callStep2', 'callStep3'] as step, index}<li class="flex items-start gap-2 text-body-sm text-on-surface-variant"><span class="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[10px] text-white">{index + 1}</span>{t(step as 'callStep1')}</li>{/each}</ol></div>
     <p class="flex items-start gap-2 text-body-sm text-on-surface-variant"><Icon name="lock" size={17} class="shrink-0 text-secondary" />{t('callPrivacy')}</p>
     <label class="flex min-h-12 items-start gap-3 rounded-xl bg-surface-container-low p-3 text-body-sm text-primary"><input class="mt-1 size-5 shrink-0 accent-primary" type="checkbox" bind:checked={consent} required />{t('confirmConsent')}</label>
-    {#if failed}<p role="alert" class="rounded-xl bg-error-container p-3 text-body-sm text-error">{t('error')}</p>{/if}
+    {#if failed}<p role="alert" class="rounded-xl bg-error-container p-3 text-body-sm text-error">{t(failed)}</p>{/if}
     <Button type="submit" class="w-full" disabled={pending || !normalized || !purpose.trim() || !consent}><Icon name="phone" />{t(pending ? 'startingCall' : 'startCall')}</Button>
     <Button variant="quiet" class="w-full" onclick={() => open = false} disabled={pending}>{t('backToLetter')}</Button>
   </form>

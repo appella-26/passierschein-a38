@@ -16,7 +16,8 @@ Only number, reference and call purpose go to ElevenLabs/Twilio.
 pnpm install                                      # Node >= 22.17, pnpm 12
 cp .env.example .env                            # add GEMINI_API_KEY from Google AI Studio
 pnpm dev
-cloudflared tunnel --url http://localhost:5173        # URL → ElevenLabs server tool webhook
+cloudflared tunnel --url http://localhost:5173        # public URL for the agent's status webhook
+pnpm agent:sync                                       # points the ElevenLabs agent at that URL
 ```
 
 The default configuration needs no model download:
@@ -41,8 +42,8 @@ optional Ollama embedding request.
 Storage uses Node's built-in `node:sqlite`. The complete current schema is created directly on a fresh
 database; there is no legacy migration or backfill. This backend expects a fresh database.
 
-Then configure the agent from `agent/elevenlabs-agent.md`, and create the board with
-`REPO=owner/repo PROJECT="..." A=.. B=.. C=.. D=.. ./scripts/create-issues.sh`.
+The phone agent is described in `agent/elevenlabs-agent.md`; see [Phone agent](#phone-agent-elevenlabs) for the
+one-time setup. Create the board with `REPO=owner/repo PROJECT="..." A=.. B=.. C=.. D=.. ./scripts/create-issues.sh`.
 
 > SvelteKit 3 notes: env vars are declared in `src/env.ts` and imported from `$app/env/private`;
 > `$lib` is now `#lib` (imports include the `.ts` extension).
@@ -64,10 +65,11 @@ Then configure the agent from `agent/elevenlabs-agent.md`, and create the board 
 | `POST /api/case-events/:id/undo` | Undo a logged change |
 | `POST /api/chat` `{messages, case_id?, lang?}` | Assistant, streaming NDJSON events |
 | `GET /api/graph` | `{nodes, links}` for force-graph, including case nodes |
-| `POST /api/calls` `{toNumber, senderName, purpose, reference}` | Start queue-waiting call |
+| `POST /api/calls` `{toNumber, senderName, purpose, reference, letterDate?}` | Start queue-waiting call (503 if ElevenLabs isn't configured) |
 | `GET /api/calls/:id/events` | SSE status timeline |
-| `POST /api/calls/:id/cancel` | Hang up |
+| `POST /api/calls/:id/cancel` | Hang up via Twilio → `{ok, error?}` |
 | `POST /api/agent/status` | Webhook for the agent's `report_status` tool |
+| `GET /api/agent/health` | Which parts of the phone setup are configured (no secrets) |
 
 Client helpers: `src/lib/resize.ts` downsizes photos before upload; `src/lib/assistant-client.ts`
 streams chat and parses `[[letter:ID]]` / `[[case:ID]]` references.
@@ -111,9 +113,40 @@ Related letters = shared nodes, weighted reference 3 · organization 2 · person
 Search = SQLite FTS5 + `embeddinggemma` cosine, merged with reciprocal rank fusion. Gemma also emits
 bilingual keywords, so "tax" finds a "Steuerbescheid".
 
+## Phone agent (ElevenLabs)
+
+The "Wait in the queue for me" button uses the ElevenLabs agent **Digital Phone Assistant** over a Twilio
+number. How the app and the agent talk:
+
+1. `POST /api/calls` starts an outbound call (`/v1/convai/twilio/outbound-call`) with the dynamic variables
+   `call_id`, `user_name`, `sender_name`, `purpose`, `reference`, `letter_date` and `secret__webhook_secret`,
+   in the language from `AGENT_LANGUAGE`.
+2. During the call the agent's `report_status` tool posts menu / hold / human / voicemail / failed to
+   `/api/agent/status`, which the live call screen receives over SSE.
+3. The server also reads the conversation from ElevenLabs every 2 s. That catches what the agent can't
+   report itself: the transfer to your phone going through ("connected"), hang-ups, busy lines, no answer.
+   It also fills in steps if the tunnel drops and a webhook never arrives.
+4. "End call" hangs up through Twilio.
+
+One-time setup:
+
+1. In ElevenLabs, import your Twilio number (Phone Numbers → Import → Twilio) and put its ID in
+   `ELEVENLABS_PHONE_NUMBER_ID`. Without it no call can start.
+2. In `.env`: `ELEVENLABS_API_KEY`, `ELEVENLABS_AGENT_ID`, `TRANSFER_NUMBER` (your mobile, E.164),
+   a random `WEBHOOK_SECRET`, `USER_DISPLAY_NAME`, and the Twilio credentials for "End call".
+3. Start `pnpm dev` and the tunnel, then run `pnpm agent:sync`. It finds the cloudflared quick-tunnel URL
+   on its own (or pass it: `pnpm agent:sync https://….trycloudflare.com`), points `report_status` at it,
+   sets the transfer number, adds any missing phone tools and checks that ElevenLabs can reach the app.
+   Quick-tunnel URLs change on every start, so re-run it each time. `pnpm agent:check` only reports.
+
+The agent ends calls after its maximum call duration (10 minutes unless you raise it in the agent
+settings), so a long real queue can run out; the demo hotline is well under that.
+
 ## Demo safety
 
 Set `DEMO_TARGET_NUMBER` to the mock hotline (teammate's phone) so no real authority gets called.
+The tunnel makes the whole app public, so anyone with the URL could start calls: keep
+`DEMO_TARGET_NUMBER` set while it runs and stop the tunnel after the demo.
 Use redacted/sample letters only; `data/` is gitignored.
 
 ## Appella UI
@@ -155,6 +188,11 @@ node scripts/check-backend.mjs                     # isolated fresh DB + mocked 
 Browser tests mock the APIs, so they don't need Gemini or Ollama and cannot dial a real number. They cover upload,
 language persistence, reference copying, checklists, confirmation, call states, search and graph navigation,
 and capture screenshots at 390px and laptop widths in the gitignored `test-results/` directory.
+
+`tests/agent-api.spec.ts` runs the server side of a call (outbound call, status webhook, transfer, voicemail,
+busy line, hang-up) against a fake ElevenLabs and Twilio API on port 5199; `playwright.config.ts` points the
+dev server there, overriding `.env`. If a `pnpm dev` with your real keys is already running, Playwright reuses
+it and these tests skip themselves instead of calling ElevenLabs.
 
 For just the next batch of GitHub issues, use `ONLY_ROUND2=1` with `scripts/create-issues.sh`.
 The script is not run automatically.
