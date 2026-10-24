@@ -1,7 +1,7 @@
-// POST /api/calls/:id/cancel
+// POST /api/calls/:id/cancel  -> { ok, error? }
 import { json } from '@sveltejs/kit';
 import { cancelCall } from '#lib/server/calls.ts';
 
 export async function POST({ params }) {
-	return json({ ok: await cancelCall(params.id) });
+	return json(await cancelCall(params.id));
 }

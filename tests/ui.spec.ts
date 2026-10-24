@@ -113,6 +113,19 @@ test('call confirmation sends only reviewed metadata and requires consent', asyn
   await expect(page.getByRole('heading', { name: sample.sender_name })).toBeVisible();
 });
 
+test('call confirmation explains when the phone assistant is not set up', async ({ page }) => {
+  await mockApi(page);
+  await page.route('**/api/calls', route => route.fulfill({ status: 503, json: { message: 'ElevenLabs is not configured.', missing: ['ELEVENLABS_PHONE_NUMBER_ID'] } }));
+  await page.goto(`/letters/${sample.id}`);
+  await page.getByRole('button', { name: 'In der Warteschleife warten', exact: true }).click();
+  const sheet = page.getByRole('dialog');
+  await sheet.getByLabel('Rufnummer', { exact: true }).fill('0621 / 292-0');
+  await sheet.getByRole('checkbox').check();
+  await sheet.getByRole('button', { name: 'Anruf starten & Warteschleife übergeben', exact: true }).click();
+  await expect(sheet.getByRole('alert')).toContainText('Der Telefon-Assistent ist noch nicht eingerichtet.');
+  await expect(page).toHaveURL(`/letters/${sample.id}`);
+});
+
 test('all live call states render and cancellation uses the endpoint', async ({ page }) => {
   await mockApi(page);
   await page.addInitScript(() => {

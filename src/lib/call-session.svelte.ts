@@ -48,7 +48,8 @@ export function receiveEvent(event: CallEvent) {
   callSession.events.push(event);
   callSession.state = event.state;
   callSession.connection = 'live';
-  if (event.state === 'human_detected' && !alerted) {
+  // "transferring" also alerts, in case the human_detected report never arrived.
+  if ((event.state === 'human_detected' || event.state === 'transferring') && !alerted) {
     clearTimeout(alertTimer);
     // The endpoint immediately replays history. Don't alert for a call already finished.
     alertTimer = setTimeout(() => {

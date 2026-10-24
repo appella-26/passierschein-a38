@@ -15,7 +15,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "test": "playwright test"
+    "test": "playwright test",
+    "agent:sync": "node scripts/agent.mjs sync",
+    "agent:check": "node scripts/agent.mjs check"
   },
   "dependencies": {
     "@google/genai": "^2.31.0",
