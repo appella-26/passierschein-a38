@@ -1,4 +1,5 @@
-// POST /api/calls  { toNumber, senderName, purpose, reference, letterDate? } -> { id, state }
+// POST /api/calls  { toNumber, senderName, purpose, reference, letterDate? } -> { id, state, mode }
+// mode "browser": nothing is dialed; open /hotline/<id> on a second device to answer.
 // 503 { message, missing } when ElevenLabs isn't configured yet.
 import { json, error } from '@sveltejs/kit';
 import { CallSetupError, startCall } from '#lib/server/calls.ts';
@@ -20,7 +21,7 @@ export async function POST({ request }) {
 			reference: text(body?.reference, 500),
 			letterDate: text(body?.letterDate, 32) || undefined
 		});
-		return json({ id: call.id, state: call.state });
+		return json({ id: call.id, state: call.state, mode: call.mode });
 	} catch (err) {
 		if (err instanceof CallSetupError) return json({ message: err.message, missing: err.missing }, { status: 503 });
 		throw err;

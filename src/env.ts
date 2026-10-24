@@ -28,6 +28,11 @@ export const variables = defineEnvVars({
 		schema: optional('https://api.elevenlabs.io'),
 		description: 'ElevenLabs API base URL (EU data residency: https://api.eu.residency.elevenlabs.io)'
 	},
+	CALL_MODE: {
+		schema: optional('auto'),
+		description:
+			'phone (dial via the imported Twilio number), browser (free demo: a second device answers at /hotline/<id>), or auto = phone once ELEVENLABS_PHONE_NUMBER_ID is set'
+	},
 	AGENT_LANGUAGE: {
 		schema: optional(''),
 		description: 'Language the agent starts each call in, e.g. "de". Empty = the agent default.'

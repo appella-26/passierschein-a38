@@ -24,6 +24,9 @@ const AGENT_ID = env.ELEVENLABS_AGENT_ID;
 const TRANSFER_NUMBER = env.TRANSFER_NUMBER?.replace(/[\s/()-]/g, '');
 const LANGUAGE = env.AGENT_LANGUAGE?.trim();
 const E164 = /^\+[1-9]\d{6,14}$/;
+// Same rule as callMode() in src/lib/server/calls.ts: no phone number means the free browser hotline.
+const CALL_MODE = env.CALL_MODE === 'phone' || env.CALL_MODE === 'browser' ? env.CALL_MODE : env.ELEVENLABS_PHONE_NUMBER_ID ? 'phone' : 'browser';
+const BROWSER = CALL_MODE === 'browser';
 const STATUS_TOOL = 'report_status';
 const STATUS_PATH = '/api/agent/status';
 const PLACEHOLDER_URL = `https://appella-tunnel-not-set.invalid${STATUS_PATH}`;
@@ -295,7 +298,8 @@ async function check(argument, knownUrl) {
 	if (missing.length) bad(`Missing phone tools: ${missing.join(', ')}`, 'Run pnpm agent:sync');
 	else ok('Phone tools: skip turn, keypad tones, end call, voicemail and language detection');
 	const transferTo = tools.transfer_to_number?.params?.transfers?.map((rule) => rule.transfer_destination?.phone_number).filter(Boolean) ?? [];
-	if (!TRANSFER_NUMBER) bad('TRANSFER_NUMBER is not set, so nobody is called when a person answers.', 'Add your mobile in E.164 (e.g. +49151…) to .env, then run pnpm agent:sync');
+	if (!TRANSFER_NUMBER && BROWSER) ok('Browser hotline: the agent hands over in person, no transfer number needed');
+	else if (!TRANSFER_NUMBER) bad('TRANSFER_NUMBER is not set, so nobody is called when a person answers.', 'Add your mobile in E.164 (e.g. +49151…) to .env, then run pnpm agent:sync');
 	else if (!E164.test(TRANSFER_NUMBER)) bad(`TRANSFER_NUMBER "${env.TRANSFER_NUMBER}" is not in E.164 format.`, 'Use +<country code><number>, e.g. +4915112345678');
 	else if (!transferTo.includes(TRANSFER_NUMBER)) bad(`The agent transfers to ${transferTo.join(', ') || 'nobody'}, not TRANSFER_NUMBER.`, 'Run pnpm agent:sync');
 	else ok(`Transfers to ${TRANSFER_NUMBER} (conference, with a briefing)`);
@@ -314,7 +318,9 @@ async function check(argument, knownUrl) {
 	}
 
 	// Phone number.
-	if (!env.ELEVENLABS_PHONE_NUMBER_ID) {
+	if (BROWSER) {
+		ok('Browser hotline mode: calls are answered at /hotline/<id> on a second device, nothing is dialed');
+	} else if (!env.ELEVENLABS_PHONE_NUMBER_ID) {
 		bad('ELEVENLABS_PHONE_NUMBER_ID is not set.', 'Import your Twilio number in ElevenLabs (Phone Numbers → Import) and copy its ID into .env');
 	} else {
 		try {
@@ -329,7 +335,7 @@ async function check(argument, knownUrl) {
 	// .env bits the app itself needs.
 	if (!env.WEBHOOK_SECRET || env.WEBHOOK_SECRET === 'change-me') warn('WEBHOOK_SECRET is empty or the example value.', 'Set a random string, e.g. `openssl rand -hex 16`');
 	else ok('WEBHOOK_SECRET is set');
-	if (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN) warn('No Twilio credentials, so "End call" in the app cannot hang up.', 'Set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN');
+	if (!BROWSER && (!env.TWILIO_ACCOUNT_SID || !env.TWILIO_AUTH_TOKEN)) warn('No Twilio credentials, so "End call" in the app cannot hang up.', 'Set TWILIO_ACCOUNT_SID and TWILIO_AUTH_TOKEN');
 	if (env.DEMO_TARGET_NUMBER) ok(`Demo safety on: every call goes to ${env.DEMO_TARGET_NUMBER}`);
 
 	// Can ElevenLabs reach the app?

@@ -20,6 +20,7 @@
     "agent:check": "node scripts/agent.mjs check"
   },
   "dependencies": {
+    "@elevenlabs/client": "1.27.0",
     "@google/genai": "^2.31.0",
     "better-sqlite3": "^13.0.3",
     "d3-force": "^3.0.0",
