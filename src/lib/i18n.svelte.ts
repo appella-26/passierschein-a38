@@ -134,7 +134,22 @@ const de = {
   chatOpenLetter: 'Brief öffnen', chatOpenCase: 'Akte ansehen', chatReviewCall: 'Anruf prüfen', chatActionFailed: 'Der Brief konnte nicht geladen werden. Bitte erneut versuchen.',
   chatCaseFailed: 'Diese Akte konnte nicht geladen werden.', chatContextFailed: 'Dieser Brief oder diese Akte ist nicht verfügbar.',
   chatInfo: 'Über diesen Chat', chatPrivacy: 'Nachrichten und relevante Briefdetails gehen an den konfigurierten KI-Dienst. Der Chatverlauf bleibt im Browser-Speicher und wird beim Neuladen gelöscht. Ein neuer Chat macht gespeicherte Änderungen nicht rückgängig.',
-  caseLabel: 'Akte', assistantError: 'Der Assistent ist gerade nicht erreichbar (Fehler {status}). Bitte erneut versuchen.'
+  caseLabel: 'Akte', assistantError: 'Der Assistent ist gerade nicht erreichbar (Fehler {status}). Bitte erneut versuchen.',
+  rehearsalTitle: 'Browser-Probe', rehearsalLink: 'Ohne Telefon im Browser proben',
+  rehearsalIntro: 'Probelauf ohne Telefon: Der Assistent läuft hier im Browser. Eine zweite Person spielt die Hotline des Finanzamts laut ins Mikrofon dieses Geräts.',
+  rehearsalBoundary: 'Nur eine Probe: Es wird keine Nummer gewählt und nichts weitergeleitet. Der Assistent kennt nur Beispieldaten (Aktenzeichen DEMO-2026).',
+  rehearsalScript: 'Skript für die Hotline', rehearsalScriptMenu: 'Menü-Ansage', rehearsalScriptHold: 'Warteschleife', rehearsalScriptHuman: 'Eine Person meldet sich', rehearsalPause: 'Danach 10 Sekunden still sein.',
+  rehearsalStart: 'Probe starten', rehearsalStarting: 'Mikrofon wird verbunden…', rehearsalStop: 'Probe abbrechen', rehearsalAgain: 'Neue Probe',
+  rehearsalSpeaking: 'Der Assistent spricht', rehearsalListening: 'Der Assistent hört zu', rehearsalProgress: 'Verlauf', rehearsalPending: 'Noch nicht erkannt',
+  rehearsal_ivr: 'Menü erkannt', rehearsal_on_hold: 'In der Warteschleife', rehearsal_human_detected: 'Eine Person hat sich gemeldet', rehearsal_voicemail: 'Mailbox oder geschlossen',
+  rehearsalTakeOver: 'Hier übernehmen', rehearsalTakeOverHint: 'Jemand hat sich gemeldet. Übernehmen Sie jetzt das Gespräch.',
+  rehearsalTakenOver: 'Sie sind dran', rehearsalTakenOverHint: 'Der Assistent ist beendet. Sprechen Sie jetzt direkt mit der Person im Raum.',
+  rehearsalVoicemailEnded: 'Mailbox erreicht. Der Assistent hat aufgelegt, ohne eine Nachricht zu hinterlassen.',
+  rehearsalEnded: 'Probe beendet', rehearsalEndedHint: 'Eine Probe dauert höchstens 3 Minuten.',
+  rehearsalTranscript: 'Mitschrift', rehearsalHotline: 'Hotline', rehearsalAgent: 'Assistent',
+  rehearsalNotConfigured: 'Die Browser-Probe ist noch nicht eingerichtet. Tragen Sie ELEVENLABS_API_KEY und ELEVENLABS_BROWSER_AGENT_ID in die .env-Datei ein und starten Sie die App neu.',
+  rehearsalError: 'Die Verbindung zum Assistenten ist fehlgeschlagen. Prüfen Sie die ElevenLabs-Einstellungen und versuchen Sie es erneut.',
+  rehearsalMicDenied: 'Ohne Mikrofon hört der Assistent die Hotline nicht. Erlauben Sie den Mikrofonzugriff und versuchen Sie es erneut.'
 } as const;
 
 const en: Record<keyof typeof de, string> = {
@@ -270,7 +285,22 @@ const en: Record<keyof typeof de, string> = {
   chatOpenLetter: 'Open letter', chatOpenCase: 'View case', chatReviewCall: 'Review call', chatActionFailed: 'We couldn’t load the letter. Try again.',
   chatCaseFailed: 'We couldn’t load this case.', chatContextFailed: 'That letter or case is unavailable.',
   chatInfo: 'About this chat', chatPrivacy: 'Messages and relevant letter details go to your chosen AI service. Chat history stays in browser memory and clears on reload. A new chat doesn’t undo saved changes.',
-  caseLabel: 'Case', assistantError: 'We couldn’t reach the assistant (error {status}). Try again.'
+  caseLabel: 'Case', assistantError: 'We couldn’t reach the assistant (error {status}). Try again.',
+  rehearsalTitle: 'Browser rehearsal', rehearsalLink: 'Rehearse in the browser, no phone needed',
+  rehearsalIntro: 'A rehearsal without a phone: the assistant runs here in the browser while someone plays the tax office hotline out loud into this device’s microphone.',
+  rehearsalBoundary: 'Rehearsal only: no number is dialled and nothing is transferred. The assistant only knows sample data (reference DEMO-2026).',
+  rehearsalScript: 'Script for the hotline', rehearsalScriptMenu: 'Menu announcement', rehearsalScriptHold: 'Hold', rehearsalScriptHuman: 'A person answers', rehearsalPause: 'Then stay quiet for 10 seconds.',
+  rehearsalStart: 'Start rehearsal', rehearsalStarting: 'Connecting the microphone…', rehearsalStop: 'Stop rehearsal', rehearsalAgain: 'Start again',
+  rehearsalSpeaking: 'The assistant is speaking', rehearsalListening: 'The assistant is listening', rehearsalProgress: 'Progress', rehearsalPending: 'Not heard yet',
+  rehearsal_ivr: 'Menu recognised', rehearsal_on_hold: 'On hold', rehearsal_human_detected: 'A person answered', rehearsal_voicemail: 'Voicemail or closed',
+  rehearsalTakeOver: 'Take over here', rehearsalTakeOverHint: 'Someone answered. Take over the conversation now.',
+  rehearsalTakenOver: 'Your turn', rehearsalTakenOverHint: 'The assistant has stopped. Talk to the person in the room directly.',
+  rehearsalVoicemailEnded: 'Reached voicemail. The assistant hung up without leaving a message.',
+  rehearsalEnded: 'Rehearsal ended', rehearsalEndedHint: 'A rehearsal lasts at most 3 minutes.',
+  rehearsalTranscript: 'Transcript', rehearsalHotline: 'Hotline', rehearsalAgent: 'Assistant',
+  rehearsalNotConfigured: 'The browser rehearsal isn’t set up yet. Add ELEVENLABS_API_KEY and ELEVENLABS_BROWSER_AGENT_ID to .env, then restart the app.',
+  rehearsalError: 'Couldn’t connect to the assistant. Check the ElevenLabs settings and try again.',
+  rehearsalMicDenied: 'Without the microphone the assistant can’t hear the hotline. Allow microphone access and try again.'
 };
 
 export const dictionary = { de, en };

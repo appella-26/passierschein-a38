@@ -20,6 +20,7 @@ export default defineConfig({
       ELEVENLABS_API_KEY: 'test-key',
       ELEVENLABS_AGENT_ID: 'agent_test',
       ELEVENLABS_PHONE_NUMBER_ID: 'phnum_test',
+      ELEVENLABS_BROWSER_AGENT_ID: 'agent_rehearsal_test',
       TWILIO_API_URL: 'http://127.0.0.1:5199',
       TWILIO_ACCOUNT_SID: 'AC_test',
       TWILIO_AUTH_TOKEN: 'test-token',

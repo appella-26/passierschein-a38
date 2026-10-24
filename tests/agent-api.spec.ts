@@ -13,6 +13,8 @@ const hangups: { sid: string; status: string }[] = [];
 const conversations = new Map<string, Json>();
 const conversationOf = new Map<string, string>(); // call id -> conversation id
 const twilioCalls = new Map<string, { status: string; answerOnCancel?: boolean }>(); // call SID -> Twilio state
+const tokenRequests: string[] = []; // agent_id of each browser-rehearsal token request
+let tokenStatus = 200;
 let server: Server | undefined;
 let wiredToMock = false;
 
@@ -63,6 +65,12 @@ test.beforeAll(async () => {
 				conversations.set(id, { conversation_id: id, status: 'initiated', transcript: [], metadata: { start_time_unix_secs: Math.floor(Date.now() / 1000) - 120 } });
 				twilioCalls.set(`CA_${next}`, { status: 'in-progress' });
 				return send(res, 200, { success: true, message: 'Success', conversation_id: id, callSid: `CA_${next}` });
+			}
+			if (req.method === 'GET' && url.pathname === '/v1/convai/conversation/token') {
+				if (req.headers['xi-api-key'] !== 'test-key') return send(res, 401, { detail: { message: 'Invalid API key' } });
+				tokenRequests.push(url.searchParams.get('agent_id') ?? '');
+				if (tokenStatus !== 200) return send(res, tokenStatus, { detail: { message: 'Agent not found' } });
+				return send(res, 200, { token: `rehearsal_token_${tokenRequests.length}` });
 			}
 			const conversation = url.pathname.match(/^\/v1\/convai\/conversations\/([^/]+)$/);
 			if (req.method === 'GET' && conversation) {
@@ -301,4 +309,30 @@ test('hang-up retries when the call is answered mid-cancel', async ({ request })
 	expect(hangups.slice(before).map((hangup) => hangup.status)).toEqual(['canceled', 'completed']);
 	expect(twilio.status).toBe('completed');
 	expect((await timeline(id, (seen) => seen.includes('ended'))).at(-1)?.state).toBe('ended');
+});
+
+test('browser rehearsal mints a token for the rehearsal agent only, and never dials', async ({ request }) => {
+	const before = outbound.length;
+	const status = await request.get('/api/rehearsal');
+	expect(status.headers()['cache-control']).toBe('no-store');
+	expect(await status.json()).toEqual({ ready: true, missing: [] });
+
+	const res = await request.post('/api/rehearsal');
+	expect(res.status()).toBe(200);
+	const body = await res.json();
+	expect(body).toEqual({ conversationToken: expect.stringMatching(/^rehearsal_token_\d+$/) });
+	expect(JSON.stringify(body)).not.toContain('test-key');
+	expect(tokenRequests.at(-1)).toBe('agent_rehearsal_test');
+	expect(outbound.length).toBe(before);
+});
+
+test('browser rehearsal hides ElevenLabs errors behind a classified 502', async ({ request }) => {
+	tokenStatus = 404;
+	try {
+		const res = await request.post('/api/rehearsal');
+		expect(res.status()).toBe(502);
+		expect(await res.json()).toEqual({ message: 'ElevenLabs could not start the rehearsal.', code: 'configuration' });
+	} finally {
+		tokenStatus = 200;
+	}
 });
